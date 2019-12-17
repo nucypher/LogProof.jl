@@ -1,0 +1,11 @@
+name = "LogProof"
+uuid = "72e8a3f7-dc97-4f2f-90c4-89fa0898eda9"
+authors = ["Bogdan Opanchuk <bogdan@opanchuk.net>"]
+version = "0.1.0"
+
+[deps]
+DarkIntegers = "95d18f7b-8dde-4426-a3cb-b3b9e7df9890"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+
+[compat]
+julia = "≥ 1.0.0"
