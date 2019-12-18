@@ -79,8 +79,6 @@ end
 
 function prover_folding(channel::IOChannel, rng, pk::ProverKnowledgeFolding)
 
-    println("Prover - folding (length $(length(pk.verifier_knowledge.g_vec)))")
-
     vk = pk.verifier_knowledge
     l = length(vk.g_vec)
 
@@ -127,8 +125,6 @@ end
 
 
 function verifier_folding(channel::IOChannel, rng, vk::VerifierKnowledgeFolding)
-
-    println("Verifier - folding (length $(length(vk.g_vec)))")
 
     l = length(vk.g_vec)
 

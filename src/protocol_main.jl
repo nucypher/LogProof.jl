@@ -123,8 +123,6 @@ end
 
 function prover(channel::IOChannel, rng::AbstractRNG, pk::ProverKnowledge)
 
-    println("Prover - main")
-
     vk = pk.verifier_knowledge
 
     R1, R2 = find_residuals(vk.A, pk.S, vk.T)
@@ -201,8 +199,6 @@ end
 
 
 function verifier(channel::IOChannel, rng::AbstractRNG, vk::VerifierKnowledge)
-
-    println("Verifier - main")
 
     w = take!(channel)
 

@@ -17,8 +17,6 @@ end
 
 function prover_inner_product(channel::IOChannel, rng, pk::ProverKnowledgeInnerProduct)
 
-    println("Prover - inner product")
-
     a = take!(channel)
 
     vk = pk.verifier_knowledge
@@ -63,8 +61,6 @@ end
 
 function verifier_inner_product(channel::IOChannel, rng, vk::VerifierKnowledgeInnerProduct)
 
-    println("Verifier - inner product")
-
     a = rand_G(rng)
     put!(channel, a)
 
@@ -88,5 +84,4 @@ function verifier_inner_product(channel::IOChannel, rng, vk::VerifierKnowledgeIn
     a = vk_folded.a
 
     @assert t_pprime^c * w * w_prime^inv(c) == g^z1 * h^z2 * a^(inv(c) * z1 * z2) * u^tau
-    println("Verifier: checked")
 end
