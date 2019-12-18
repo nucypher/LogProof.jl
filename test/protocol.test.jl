@@ -1,12 +1,3 @@
-push!(LOAD_PATH, "./src")
-
-using BenchmarkTools
-using DarkIntegers
-using Random
-
-using LogProof
-
-
 function make_A(rng::AbstractRNG, rows::Int, cols::Int)
     [rand_Zq_polynomial(rng) for i in 1:rows, j in 1:cols]
 end
@@ -19,7 +10,10 @@ function make_S(rng::AbstractRNG, rows::Int, cols::Int, B::Int)
 end
 
 
-function run_inner_product()
+@testgroup "Protocol" begin
+
+
+@testcase "Inner product" begin
     rng = MersenneTwister(123)
 
     l = 201
@@ -38,7 +32,7 @@ function run_inner_product()
 end
 
 
-function run_folding()
+@testcase "Folding" begin
     rng = MersenneTwister(123)
 
     l = 8
@@ -59,7 +53,7 @@ function run_folding()
 end
 
 
-function run_main()
+@testcase "Full" begin
     n = 2
     m = 3
     k = 4
@@ -72,18 +66,13 @@ function run_main()
 
     s_vec = LogProof.serialize(S)
 
-    # TODO: matrix multiplication is not type stable because zero polynomial has its own type
-    T = convert.(LogProof.Rq, A * S)
+    T = A * S
 
     vk = VerifierKnowledge(rng, A, T, B)
     pk = ProverKnowledge(vk, S)
-
-    println("Running protocol")
 
     run_pair(prover, verifier, (rng, pk), (rng, vk))
 end
 
 
-#run_inner_product()
-#run_folding()
-run_main()
+end
