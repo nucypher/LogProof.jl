@@ -1,8 +1,8 @@
 const q = UInt64(251)
-const Zq = RRElem{UInt64, q}
+const Zq = ModUInt{UInt64, q}
 
 const p = secp256k1_order # 0xffffffff00000001
-const Zp = RRElem{secp256k1_base_type, p} # RRElem{UInt64, p}
+const Zp = ModUInt{secp256k1_base_type, p} # ModUInt{UInt64, p}
 
 # in the centered representation the range of Z* is [-half_mod, half_mod]
 half_mod(::Type{Zq}) = convert(Zq, q >> 1)
@@ -16,9 +16,14 @@ const Rq = Polynomial{Zq}
 const d = 8
 const f_norm = 1 # maximum absolute value of all of coefficients of `f`
 
+
+# For faster start up
+DarkIntegers.known_isprime(::Val{p}) = false
+
+
 # Polynomial x^d + 1 for use in find_residuals()
-const f_exp = Polynomial(convert.(Zp, vcat([1], zeros(Int, d-1), [1], zeros(Int, d-1))), true,
-    DarkIntegers.karatsuba_mul)
+const f_exp = Polynomial(
+    convert.(Zp, vcat([1], zeros(Int, d-1), [1], zeros(Int, d-1))), negacyclic_modulus)
 
 
 function rand_Zq(rng, B::Int=0)
@@ -33,46 +38,46 @@ end
 
 
 function rand_Zq_polynomial(rng::AbstractRNG, B::Int=0)
-    Polynomial([rand_Zq(rng, B) for i in 1:d], true, DarkIntegers.karatsuba_mul)
+    Polynomial([rand_Zq(rng, B) for i in 1:d], negacyclic_modulus)
 end
 
 
-function rand_mp(rng, ::Type{MPNumber{N, T}}) where {N, T}
-    MPNumber{N, T}(tuple((rand(rng, T) for i in 1:N)...))
+function rand_mp(rng, ::Type{MLUInt{N, T}}) where {N, T}
+    MLUInt{N, T}(tuple((rand(rng, T) for i in 1:N)...))
 end
 
 
-function rand_mp(rng, a::MPNumber{N, T}, b::MPNumber{N, T}) where {N, T}
+function rand_mp(rng, a::MLUInt{N, T}, b::MLUInt{N, T}) where {N, T}
     while true
-        res = rand_mp(rng, MPNumber{N, T})
-        if res <= b && (a == zero(MPNumber{N, T}) || res >= a)
+        res = rand_mp(rng, MLUInt{N, T})
+        if res <= b && (a == zero(MLUInt{N, T}) || res >= a)
             return res
         end
     end
 end
 
 
-function rand_Zp(rng, min_val::RRElemMontgomery{T, M}, max_val::RRElemMontgomery{T, M}) where {T, M}
-    RRElemMontgomery{T, M}(rand_mp(rng, min_val.value, max_val.value), DarkIntegers._no_modulo)
+function rand_Zp(rng, min_val::MgModUInt{T, M}, max_val::MgModUInt{T, M}) where {T, M}
+    MgModUInt{T, M}(rand_mp(rng, min_val.value, max_val.value), DarkIntegers._no_modulo)
 end
 
 
 function rand_Zp(rng)
-    tp = DarkIntegers.rr_base_type(Zp)
-    m = DarkIntegers.rr_modulus(Zp)
+    tp = eltype(Zp)
+    m = modulus(Zp)
     Zp(rand_mp(rng, zero(tp), m - one(tp)), DarkIntegers._verbatim)
 end
 
 
 function rand_Zp_nonzero(rng)
-    tp = DarkIntegers.rr_base_type(Zp)
-    m = DarkIntegers.rr_modulus(Zp)
+    tp = eltype(Zp)
+    m = modulus(Zp)
     Zp(rand_mp(rng, one(tp), m - one(tp)), DarkIntegers._verbatim)
 end
 
 
 function rand_G(rng)
-    tp = DarkIntegers.rr_base_type(secp256k1_type)
+    tp = eltype(secp256k1_type)
     res = Zp(rand_mp(rng, one(tp), p), DarkIntegers._verbatim)
     #secp256k1_base^res
     instantiate(LazyPoint(secp256k1_curve, res))
@@ -82,7 +87,9 @@ end
 # Convert a polynomial on a ring to a polynomial with coefficients in Z and double length
 # (so that multiplication result fit in)
 function expand(p::Rq)
-    change_length(2 * length(p.coeffs), Polynomial(convert.(Zp, p.coeffs), p.negacyclic, DarkIntegers.karatsuba_mul))
+    change_length(
+        2 * length(p.coeffs),
+        Polynomial(convert.(Zp, p.coeffs), p.modulus))
 end
 
 
@@ -115,7 +122,7 @@ function Base.divrem(p::Polynomial, f::Polynomial)
         # TODO: assuming here that there is no remainder
         c = p.coeffs[p_deg + 1] ÷ f.coeffs[f_deg + 1]
 
-        p -= shift_polynomial(f, p_deg - f_deg) * c
+        p -= mul_by_monomial(f, p_deg - f_deg) * c
         r.coeffs[p_deg - f_deg + 1] = c
     end
 end
@@ -126,7 +133,7 @@ function apply(p::Polynomial{T}, alpha::T) where T
 end
 
 
-Base.copy(p::Polynomial) = Polynomial(copy(p.coeffs), p.negacyclic)
+Base.copy(p::Polynomial) = Polynomial(copy(p.coeffs), p.modulus)
 
 
 """
@@ -141,8 +148,8 @@ function binary(val::T, b::Int) where T <: Union{Zq, Zp}
     if is_negative
         val += 1 << (b-1) # adding an offset and treating it as a positive number
     end
-    x = DarkIntegers.rr_value(val)
-    res = Array{Bool, 1}(undef, b)
+    x = value(val)
+    res = BitArray{1}(undef, b)
     for i in 1:(b-1)
         res[i] = isodd(x)
         x >>= 1

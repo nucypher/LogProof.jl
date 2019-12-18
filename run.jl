@@ -13,7 +13,9 @@ end
 
 
 function make_S(rng::AbstractRNG, rows::Int, cols::Int, B::Int)
-    [rand_Zq_polynomial(rng, 2 * B) - unsigned(B) for i in 1:rows, j in 1:cols]
+    [
+        broadcast_into_polynomial(-, rand_Zq_polynomial(rng, 2 * B), unsigned(B))
+        for i in 1:rows, j in 1:cols]
 end
 
 
@@ -67,6 +69,8 @@ function run_main()
 
     A = make_A(rng, n, m)
     S = make_S(rng, m, k, B)
+
+    s_vec = LogProof.serialize(S)
 
     # TODO: matrix multiplication is not type stable because zero polynomial has its own type
     T = convert.(LogProof.Rq, A * S)

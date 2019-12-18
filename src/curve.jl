@@ -47,7 +47,7 @@ function instantiate(x::LazyPoint{T, V}) where {T, V}
 
     @assert !iszero(x.power)
 
-    y = x.power.value # FIXME: needs conversion if V is Montgomery
+    y = value(x.power)
 
     tz = trailing_zeros(y)
     res = secp256k1_powers[tz + 1]
@@ -79,39 +79,13 @@ function Base.:*(x::LazyPoint{T, V}, y::LazyPoint{T, V}) where {T, V}
 end
 
 
-#function Base.:^(x::Point, y::Union{Integer, BigInt})
-#    x^DarkIntegers.rr_value_simple(y)
-#end
-
-
-function Base.:^(x::Point, y::RRElem)
-    x^DarkIntegers.rr_value_simple(y)
+function Base.:^(x::Point, y::ModUInt)
+    x^value(y)
 end
 
-function Base.:^(x::Point, y::RRElemMontgomery)
-    x^DarkIntegers.from_montgomery(y)
+function Base.:^(x::Point, y::MgModUInt)
+    x^value(y)
 end
-
-
-#=
-function Base.:^(x::Point, y::Union{Integer, BigInt})
-    @assert y > 0
-    if y == 1
-        x
-    else
-        acc = x
-        y -= 1
-        while y > 1
-            if isodd(y)
-                acc *= x
-            end
-            x *= x
-            y >>= 1
-        end
-        x * acc
-    end
-end
-=#
 
 
 function Base.:*(p::Point{T}, q::Point{T}) where T
@@ -145,7 +119,7 @@ end
 
 
 function test()
-    tp = RRElem{UInt64, UInt64(251)}
+    tp = ModUInt{UInt64, UInt64(251)}
     params = CurveParams(tp(0), tp(7))
 
     pts = []
@@ -173,8 +147,6 @@ function test()
 
         order = j - 1
 
-        #println([(p.x, p.y) for p in ps])
-
         if ps[end] * g != g
             println((g, ps[end], g^order, g^(order+1), ps[end]*g))
             error()
@@ -186,31 +158,26 @@ function test()
 
         l = length(Set(ps))
         println("g=($(g.x), $(g.y)), order=$order, distinct=$l")
-
-        #res = [g^j for j in 1:251]
-        #if length(Set(res)) == 251
-        #    println(g)
-        #end
     end
 
 end
 
 
 function test_secp256()
-    m = zero(MPNumber{8, UInt32}) - 2^32 - 2^9 - 2^8 - 2^7 - 2^6 - 2^4 - 1
-    tp = RRElem{MPNumber{8, UInt32}, m}
+    m = zero(MLUInt{8, UInt32}) - 2^32 - 2^9 - 2^8 - 2^7 - 2^6 - 2^4 - 1
+    tp = ModUInt{MLUInt{8, UInt32}, m}
     a = zero(tp)
     b = convert(tp, 7)
     params = CurveParams{tp}(a, b)
     g = Point{tp}(
             params,
-            MPNumber{8, UInt32}(reverse((
+            MLUInt{8, UInt32}(reverse((
                 0x79BE667E, 0xF9DCBBAC, 0x55A06295, 0xCE870B07,
                 0x029BFCDB, 0x2DCE28D9, 0x59F2815B, 0x16F81798))),
-            MPNumber{8, UInt32}(reverse((
+            MLUInt{8, UInt32}(reverse((
                 0x483ADA77, 0x26A3C465, 0x5DA4FBFC, 0x0E1108A8,
                 0xFD17B448, 0xA6855419, 0x9C47D08F, 0xFB10D4B8))))
-    n_mp = MPNumber{8, UInt32}(reverse((
+    n_mp = MLUInt{8, UInt32}(reverse((
             0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFE,
             0xBAAEDCE6, 0xAF48A03B, 0xBFD25E8C, 0xD0364141)))
     n = convert(BigInt, n_mp)
@@ -223,12 +190,12 @@ end
 
 
 #=
-const secp256k1_base_type = MPNumber{8, UInt32}
+const secp256k1_base_type = MLUInt{8, UInt32}
 const secp256k1_modulus = zero(secp256k1_base_type) - 2^32 - 2^9 - 2^8 - 2^7 - 2^6 - 2^4 - 1
-const secp256k1_order = MPNumber{8, UInt32}(reverse((
+const secp256k1_order = MLUInt{8, UInt32}(reverse((
             0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFE,
             0xBAAEDCE6, 0xAF48A03B, 0xBFD25E8C, 0xD0364141)))
-const secp256k1_type = RRElemMontgomery{secp256k1_base_type, secp256k1_modulus}
+const secp256k1_type = ModUIntMontgomery{secp256k1_base_type, secp256k1_modulus}
 const secp256k1 = CurveParams{secp256k1_type}(zero(secp256k1_type), convert(secp256k1_type, 7))
 const secp256k1_base = Point{secp256k1_type}(
             secp256k1,
@@ -240,12 +207,12 @@ const secp256k1_base = Point{secp256k1_type}(
                 0xFD17B448, 0xA6855419, 0x9C47D08F, 0xFB10D4B8))))
 =#
 
-const secp256k1_base_type = MPNumber{4, UInt64}
+const secp256k1_base_type = MLUInt{4, UInt64}
 const secp256k1_modulus = zero(secp256k1_base_type) - 2^32 - 2^9 - 2^8 - 2^7 - 2^6 - 2^4 - 1
-const secp256k1_order = MPNumber{4, UInt64}(reverse((
+const secp256k1_order = MLUInt{4, UInt64}(reverse((
             0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFE,
             0xBAAEDCE6AF48A03B, 0xBFD25E8CD0364141)))
-const secp256k1_type = RRElem{secp256k1_base_type, secp256k1_modulus}
+const secp256k1_type = ModUInt{secp256k1_base_type, secp256k1_modulus}
 const secp256k1 = CurveParams{secp256k1_type}(zero(secp256k1_type), convert(secp256k1_type, 7))
 const secp256k1_base = Point{secp256k1_type}(
             secp256k1,

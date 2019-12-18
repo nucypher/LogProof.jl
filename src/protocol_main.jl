@@ -12,7 +12,7 @@ struct VerifierKnowledge
     h_vec :: Array{G, 1}
     u :: G
 
-    function VerifierKnowledge(rng, A::Array{Rq, 2}, T::Array{Rq, 2}, B::Int)
+    function VerifierKnowledge(rng, A::Array{<:Rq, 2}, T::Array{<:Rq, 2}, B::Int)
 
         n, m = size(A)
         n, k = size(T)
@@ -37,16 +37,20 @@ struct ProverKnowledge
 end
 
 
-to_zp(x::Zq) = convert(Zp, x) - (x > q ÷ 2 ? q : 0)
-to_zp(x::Polynomial{Zq}) = Polynomial(to_zp.(x.coeffs), x.negacyclic, DarkIntegers.karatsuba_mul)
+to_zp(x::Zq) = convert(Zp, value(x)) - (x > q ÷ 2 ? q : 0)
+to_zp(x::Polynomial{Zq}) = Polynomial(to_zp.(x.coeffs), x.modulus)
 
 central(x::Zq) = big(x) > big(q) ÷ 2 ? (big(x) - big(q)) : big(x)
-central(x::Zp) = big(x) > big(p) ÷ 2 ? (big(x) - big(p)) : big(x)
+function central(x::Zp)
+    x_bi = convert(BigInt, value(x))
+    p_bi = convert(BigInt, p)
+    x_bi > p_bi ÷ 2 ? (x_bi - p_bi) : x_bi
+end
 
 
 # Find R1 and R2 such that A * S + q * R1 + f * R2 = T without taking any modulus
 # (A, S, T with polynomials modulo f, and coefficients modulo q)
-function find_residuals(A::Array{Rq, 2}, S::Array{Rq, 2}, T::Array{Rq, 2})
+function find_residuals(A::Array{P, 2}, S::Array{P, 2}, T::Array{P, 2}) where P <: Rq
 
     A_exp = change_length.(2d, A)
     S_exp = change_length.(2d, S)
@@ -54,7 +58,8 @@ function find_residuals(A::Array{Rq, 2}, S::Array{Rq, 2}, T::Array{Rq, 2})
 
     X1 = T_exp - A_exp * S_exp
 
-    f_q = Polynomial(convert.(Zq, vcat([1], zeros(Int, d-1), [1], zeros(Int, d-1))), true)
+    f_q = Polynomial(
+        convert.(Zq, vcat([1], zeros(Int, d-1), [1], zeros(Int, d-1))), negacyclic_modulus)
 
     R2 = Array{eltype(A_exp)}(undef, size(X1)...)
     Q = Array{eltype(A_exp)}(undef, size(X1)...)
@@ -73,13 +78,12 @@ function find_residuals(A::Array{Rq, 2}, S::Array{Rq, 2}, T::Array{Rq, 2})
     T_Zp = to_zp.(T_exp)
     R2_Zp = to_zp.(R2)
 
-    X2 = T_Zp .- A_Zp * S_Zp .- f_exp .* R2_Zp
+    X2 = T_Zp .- A_Zp * S_Zp .- f_exp * R2_Zp
 
     q_p = convert(Zp, q)
     R1 = X2 .* inv(q_p)
 
     for i in 1:size(R1, 1), j in 1:size(R1, 2)
-        #println(central.(R1[i,j].coeffs))
         @assert all(central.(R1[i,j].coeffs) .<= bound)
     end
 
@@ -99,6 +103,23 @@ end
 serialize(p::Polynomial) = p.coeffs
 
 
+function mul_by_bool_vec(a::Array{T, 1}, v::BitArray{1}) where T
+    @assert length(a) == length(v)
+    [v[i] ? a[i] : zero(T) for i in 1:length(a)]
+end
+
+
+function exp_to_bool_vec(a::Array{T, 1}, v::BitArray{1}) where T
+    @assert length(a) == length(v)
+    res = one(T)
+    for i in 1:length(a)
+        if v[i]
+            res *= a[i]
+        end
+    end
+    res
+end
+
 
 function prover(channel::IOChannel, rng::AbstractRNG, pk::ProverKnowledge)
 
@@ -117,7 +138,7 @@ function prover(channel::IOChannel, rng::AbstractRNG, pk::ProverKnowledge)
 
     rho = rand_Zp(rng)
 
-    w = prod(vk.g_vec.^s2_vec) * prod(vk.h_vec.^s1_vec) * vk.u^rho
+    w = exp_to_bool_vec(vk.g_vec, s2_vec) * exp_to_bool_vec(vk.h_vec, s1_vec) * vk.u^rho
 
     put!(channel, w)
 
@@ -125,9 +146,9 @@ function prover(channel::IOChannel, rng::AbstractRNG, pk::ProverKnowledge)
 
     v_vec, t, g_vec_prime = commit(vk, alpha, beta_vec, gamma_vec, phi_vec, psi, w)
 
-    v1_vec = v_vec + phi_vec .* s2_vec + psi * phi_vec
-    v2_vec = s1_vec .+ psi
 
+    v1_vec = v_vec .+ mul_by_bool_vec(phi_vec, s2_vec) .+ phi_vec .* psi
+    v2_vec = convert.(Zp, s1_vec) .+ psi
     x = v1_vec' * v2_vec
 
     vk = VerifierKnowledgeInnerProduct(g_vec_prime, vk.h_vec, vk.u, t, x)
