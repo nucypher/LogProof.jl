@@ -87,9 +87,7 @@ end
 # Convert a polynomial on a ring to a polynomial with coefficients in Z and double length
 # (so that multiplication result fit in)
 function expand(p::Rq)
-    change_length(
-        2 * length(p.coeffs),
-        Polynomial(convert.(Zp, p.coeffs), p.modulus))
+    resize(Polynomial(convert.(Zp, p.coeffs), p.modulus), 2 * length(p.coeffs))
 end
 
 

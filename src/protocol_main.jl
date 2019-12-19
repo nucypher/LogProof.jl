@@ -52,9 +52,9 @@ end
 # (A, S, T with polynomials modulo f, and coefficients modulo q)
 function find_residuals(A::Array{P, 2}, S::Array{P, 2}, T::Array{P, 2}) where P <: Rq
 
-    A_exp = change_length.(2d, A)
-    S_exp = change_length.(2d, S)
-    T_exp = change_length.(2d, T)
+    A_exp = resize.(A, 2d)
+    S_exp = resize.(S, 2d)
+    T_exp = resize.(T, 2d)
 
     X1 = T_exp - A_exp * S_exp
 
@@ -89,7 +89,7 @@ function find_residuals(A::Array{P, 2}, S::Array{P, 2}, T::Array{P, 2}) where P 
 
     @assert all(T_Zp .== A_Zp * S_Zp .+ f_exp .* R2_Zp .+ q_p * R1)
 
-    change_length.(2*d-1, R1), change_length.(d-1, R2)
+    resize.(R1, 2*d-1), resize.(R2, d-1)
 end
 
 
