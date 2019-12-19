@@ -117,7 +117,7 @@ function Base.divrem(p::Polynomial, f::Polynomial)
             return r, p
         end
 
-        # TODO: assuming here that there is no remainder
+        # TODO (see issue #6 of DarkIntegers): assuming here that there is no remainder
         c = p.coeffs[p_deg + 1] ÷ f.coeffs[f_deg + 1]
 
         p -= mul_by_monomial(f, p_deg - f_deg) * c
@@ -141,7 +141,7 @@ Convert a number `z in [2^(b-1), 2^(b-1))` to its binary representation such tha
 function binary(val::T, b::Int) where T <: Union{Zq, Zp}
     # Note that we're getting numbers in Zq or Zp, (with possibly 2^b>q)
     # but the resulting contract must be valid in Zp
-    # TODO: performance can be improved
+    # TODO: (issue #1) performance can be improved
     is_negative = val > half_mod(T)
     if is_negative
         val += 1 << (b-1) # adding an offset and treating it as a positive number
@@ -162,8 +162,10 @@ end
 binary(val::AbstractArray, b::Int) = vcat([binary(x, b) for x in val]...)
 
 
+# Returns what in the paper is denoted as
+# `2_b = (1, 2, ... , 2^(b−2), −2^(b−1))'`
 function powers_of_2(::Type{T}, d) where T
     res = convert(T, 2) .^ (0:d-1)
-    res[end] = -res[end] # TODO: check if it works as intended
+    res[end] = -res[end]
     res
 end

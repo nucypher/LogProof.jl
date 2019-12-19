@@ -94,9 +94,9 @@ end
 
 
 function serialize(m::Array{T, 2}) where T
-    # TODO: matrices in Julia are stored in column-major order, and Serialize() in the paper
-    # serializes in row-major order. But perhaps it doesn't matter as long as serialization
-    # is the same for the prover and the verifier?
+    # NOTE: matrices in Julia are stored in column-major order, and Serialize() in the paper
+    # serializes in row-major order. But it doesn't matter as long as serialization
+    # is performed in the same way in the prover and the verifier.
     vcat(serialize.(permutedims(m)[:])...)
 end
 
