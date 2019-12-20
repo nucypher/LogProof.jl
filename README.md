@@ -1,5 +1,7 @@
 # Log Proofs for RLWE ciphertexts
 
+Master branch: [![CircleCI](https://circleci.com/gh/nucypher/LogProof.jl/tree/master.svg?style=svg)](https://circleci.com/gh/nucypher/LogProof.jl/tree/master) [![codecov](https://codecov.io/gh/nucypher/LogProof.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/nucypher/LogProof.jl)
+
 This is a prototype implementation of the paper by R. Pino, V. Lyubashevsky, and G. Seiler, "Short Discrete Log Proofs for FHE and Ring-LWE Ciphertexts," [eprint 2019/057](https://eprint.iacr.org/2019/057).
 
 The current implementation uses a pair of coroutines to simulate two parties without creating data structures to save intermediate state (see `src/actors.jl`).
