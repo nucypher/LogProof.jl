@@ -6,4 +6,4 @@ using DarkIntegers
 include("curve.test.jl")
 include("protocol.test.jl")
 
-runtests()
+exit(runtests())
