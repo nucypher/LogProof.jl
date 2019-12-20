@@ -64,8 +64,6 @@ end
     A = make_A(rng, n, m)
     S = make_S(rng, m, k, B)
 
-    s_vec = LogProof.serialize(S)
-
     T = A * S
 
     vk = VerifierKnowledge(rng, A, T, B)
