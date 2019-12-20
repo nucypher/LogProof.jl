@@ -57,7 +57,7 @@ end
     n = 2
     m = 3
     k = 4
-    B = 10
+    B = 7
 
     rng = MersenneTwister(123)
 
