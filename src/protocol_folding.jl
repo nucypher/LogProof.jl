@@ -77,16 +77,50 @@ function fold_commitment(vk::VerifierKnowledgeFolding, t_minus1::G, t_1::G, c::Z
 end
 
 
-function prover_folding(channel::IOChannel, rng, pk::ProverKnowledgeFolding)
+struct FoldingPayloadStage1
+    t_1 :: G
+    t_minus1 :: G
+end
 
+
+struct FoldingPayloadStage2
+    c :: Zp
+end
+
+
+function is_folded(pk::ProverKnowledgeFolding)
+    is_folded(pk.verifier_knowledge)
+end
+
+
+function is_folded(vk::VerifierKnowledgeFolding)
+    length(vk.g_vec) == 1
+end
+
+
+function finalize_folding(vk::VerifierKnowledgeFolding)
+    FoldedVerifierKnowledge(vk.g_vec[1], vk.h_vec[1], vk.a, vk.u, vk.t)
+end
+
+
+function finalize_folding(pk::ProverKnowledgeFolding)
+    fvk = finalize_folding(pk.verifier_knowledge)
+    FoldedProverKnowledge(fvk, pk.v1_vec[1], pk.v2_vec[1], pk.rho)
+end
+
+
+struct ProverFoldingIntermediateState
+    v1_t_vec :: Array{Zp, 1}
+    v1_b_vec :: Array{Zp, 1}
+    v2_t_vec :: Array{Zp, 1}
+    v2_b_vec :: Array{Zp, 1}
+    sigma_1 :: Zp
+    sigma_minus1 :: Zp
+end
+
+
+function prover_folding_stage1(rng, pk::ProverKnowledgeFolding)
     vk = pk.verifier_knowledge
-    l = length(vk.g_vec)
-
-    if l == 1
-        fvk = FoldedVerifierKnowledge(vk.g_vec[1], vk.h_vec[1], vk.a, vk.u, vk.t)
-        fpk = FoldedProverKnowledge(fvk, pk.v1_vec[1], pk.v2_vec[1], pk.rho)
-        return fpk
-    end
 
     g_t_vec, g_b_vec = halves(vk.g_vec)
     h_t_vec, h_b_vec = halves(vk.h_vec)
@@ -108,36 +142,85 @@ function prover_folding(channel::IOChannel, rng, pk::ProverKnowledgeFolding)
         * vk.a^(v1_t_vec' * v2_b_vec)
         * vk.u^sigma_1)
 
-    put!(channel, (t_minus1, t_1))
-    c = take!(channel)
+    state = ProverFoldingIntermediateState(v1_t_vec, v1_b_vec, v2_t_vec, v2_b_vec, sigma_1, sigma_minus1)
+    payload = FoldingPayloadStage1(t_1, t_minus1)
 
-    new_vk = fold_commitment(vk, t_minus1, t_1, c)
-
-    v1_prime_vec = v1_t_vec + inv(c) * v1_b_vec
-    v2_prime_vec = v2_t_vec + c * v2_b_vec
-
-    rho_pprime = inv(c) * sigma_minus1 + pk.rho + c * sigma_1
-
-    new_pk = ProverKnowledgeFolding(new_vk, v1_prime_vec, v2_prime_vec, rho_pprime)
-
-    prover_folding(channel, rng, new_pk)
+    payload, state
 end
 
 
-function verifier_folding(channel::IOChannel, rng, vk::VerifierKnowledgeFolding)
+function prover_folding_stage2(
+        pk::ProverKnowledgeFolding,
+        state::ProverFoldingIntermediateState,
+        payload1::FoldingPayloadStage1, payload2::FoldingPayloadStage2)
 
-    l = length(vk.g_vec)
+    c = payload2.c
 
-    if l == 1
-        fvk = FoldedVerifierKnowledge(vk.g_vec[1], vk.h_vec[1], vk.a, vk.u, vk.t)
-        return fvk
+    new_vk = fold_commitment(pk.verifier_knowledge, payload1.t_minus1, payload1.t_1, c)
+
+    v1_prime_vec = state.v1_t_vec + inv(c) * state.v1_b_vec
+    v2_prime_vec = state.v2_t_vec + c * state.v2_b_vec
+
+    rho_pprime = inv(c) * state.sigma_minus1 + pk.rho + c * state.sigma_1
+
+    new_pk = ProverKnowledgeFolding(new_vk, v1_prime_vec, v2_prime_vec, rho_pprime)
+end
+
+
+function verifier_folding_stage1(rng)
+    c = rand_Zp_nonzero(rng)
+    FoldingPayloadStage2(c)
+end
+
+
+function verifier_folding_stage2(
+        vk::VerifierKnowledgeFolding,
+        payload1::FoldingPayloadStage1, payload2::FoldingPayloadStage2)
+    fold_commitment(vk, payload1.t_minus1, payload1.t_1, payload2.c)
+end
+
+
+function folding_synchronous(rng, pk::ProverKnowledgeFolding, vk::VerifierKnowledgeFolding)
+    while !is_folded(vk)
+        payload1, state = prover_folding_stage1(rng, pk)
+        payload2 = verifier_folding_stage1(rng)
+
+        pk = prover_folding_stage2(pk, state, payload1, payload2)
+        vk = verifier_folding_stage2(vk, payload1, payload2)
     end
 
-    t_minus1, t_1 = take!(channel)
-    c = rand_Zp_nonzero(rng)
-    put!(channel, c)
+    finalize_folding(pk), finalize_folding(vk)
+end
 
-    new_vk = fold_commitment(vk, t_minus1, t_1, c)
 
-    verifier_folding(channel, rng, new_vk)
+function prover_folding_actor(channel::IOChannel, rng, pk::ProverKnowledgeFolding)
+
+    if is_folded(pk)
+        return finalize_folding(pk)
+    end
+
+    payload1, state = prover_folding_stage1(rng, pk)
+
+    put!(channel, payload1)
+    payload2 = take!(channel)
+
+    new_pk = prover_folding_stage2(pk, state, payload1, payload2)
+
+    prover_folding_actor(channel, rng, new_pk)
+end
+
+
+function verifier_folding_actor(channel::IOChannel, rng, vk::VerifierKnowledgeFolding)
+
+    if is_folded(vk)
+        return finalize_folding(vk)
+    end
+
+    payload1 = take!(channel)
+    payload2 = verifier_folding_stage1(rng)
+    put!(channel, payload2)
+
+    new_vk = verifier_folding_stage2(vk, payload1, payload2)
+
+    verifier_folding_actor(channel, rng, new_vk)
 end

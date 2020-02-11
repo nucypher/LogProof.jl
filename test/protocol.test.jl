@@ -32,7 +32,7 @@ end
 end
 
 
-@testcase "Folding" begin
+@testcase "Folding" for synchronous in ([false, true] => ["actors", "synchronous"])
     rng = MersenneTwister(123)
 
     l = 8
@@ -47,7 +47,14 @@ end
 
     vk = LogProof.VerifierKnowledgeFolding(g, h, a, u, t)
     pk = LogProof.ProverKnowledgeFolding(vk, v1, v2, rho)
-    pkf, vkf = run_pair(LogProof.prover_folding, LogProof.verifier_folding, (rng, pk), (rng, vk))
+
+    if synchronous
+        pkf, vkf = LogProof.folding_synchronous(rng, pk, vk)
+    else
+        pkf, vkf = run_pair(
+            LogProof.prover_folding_actor, LogProof.verifier_folding_actor,
+            (rng, pk), (rng, vk))
+    end
 
     @assert vkf.t_prime == vkf.g^pkf.v1 * vkf.h^pkf.v2 * vkf.a^(pkf.v1 * pkf.v2) * vkf.u^(pkf.rho_prime)
 end
