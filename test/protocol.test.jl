@@ -13,7 +13,7 @@ end
 @testgroup "Protocol" begin
 
 
-@testcase "Inner product" begin
+@testcase "Inner product" for synchronous in ([false, true] => ["actors", "synchronous"])
     rng = MersenneTwister(123)
 
     l = 201
@@ -28,7 +28,14 @@ end
 
     vk = LogProof.VerifierKnowledgeInnerProduct(g, h, u, t, x)
     pk = LogProof.ProverKnowledgeInnerProduct(vk, v1, v2, rho)
-    run_pair(LogProof.prover_inner_product, LogProof.verifier_inner_product, (rng, pk), (rng, vk))
+
+    if synchronous
+        LogProof.inner_product_synchronous(rng, pk, vk)
+    else
+        run_pair(
+            LogProof.prover_inner_product_actor, LogProof.verifier_inner_product_actor,
+            (rng, pk), (rng, vk))
+    end
 end
 
 
