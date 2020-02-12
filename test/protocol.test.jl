@@ -67,7 +67,7 @@ end
 end
 
 
-@testcase "Full" begin
+@testcase "Main" for synchronous in ([false, true] => ["actors", "synchronous"])
     n = 2
     m = 3
     k = 4
@@ -83,7 +83,11 @@ end
     vk = VerifierKnowledge(rng, A, T, B)
     pk = ProverKnowledge(vk, S)
 
-    run_pair(prover, verifier, (rng, pk), (rng, vk))
+    if synchronous
+        run_pair(prover_main_actor, verifier_main_actor, (rng, pk), (rng, vk))
+    else
+        main_synchronous(rng, pk, vk)
+    end
 end
 
 

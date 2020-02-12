@@ -19,8 +19,9 @@ include("protocol_folding.jl")
 include("protocol_inner_product.jl")
 
 include("protocol_main.jl")
-export prover
-export verifier
+export prover_main_actor
+export verifier_main_actor
+export main_synchronous
 export ProverKnowledge
 export VerifierKnowledge
 

@@ -121,40 +121,6 @@ function exp_to_bool_vec(a::Array{T, 1}, v::BitArray{1}) where T
 end
 
 
-function prover(channel::IOChannel, rng::AbstractRNG, pk::ProverKnowledge)
-
-    vk = pk.verifier_knowledge
-
-    R1, R2 = find_residuals(vk.A, pk.S, vk.T)
-
-    s_vec = serialize(pk.S)
-    r1_vec = serialize(R1)
-    r2_vec = serialize(R2)
-
-    s1_vec = vcat(binary(s_vec, vk.b), binary(r1_vec, vk.b1), binary(r2_vec, vk.b2))
-    s2_vec = xor.(s1_vec, ones(eltype(s1_vec), length(s1_vec)))
-
-    rho = rand_Zp(rng)
-
-    w = exp_to_bool_vec(vk.g_vec, s2_vec) * exp_to_bool_vec(vk.h_vec, s1_vec) * vk.u^rho
-
-    put!(channel, w)
-
-    alpha, beta_vec, gamma_vec, phi_vec, psi = take!(channel)
-
-    v_vec, t, g_vec_prime = commit(vk, alpha, beta_vec, gamma_vec, phi_vec, psi, w)
-
-
-    v1_vec = v_vec .+ mul_by_bool_vec(phi_vec, s2_vec) .+ phi_vec .* psi
-    v2_vec = convert.(Zp, s1_vec) .+ psi
-    x = v1_vec' * v2_vec
-
-    vk = VerifierKnowledgeInnerProduct(g_vec_prime, vk.h_vec, vk.u, t, x)
-    pk = ProverKnowledgeInnerProduct(vk, v1_vec, v2_vec, rho)
-    prover_inner_product(channel, rng, pk)
-end
-
-
 function powers(a, d)
     a .^ (0:d-1)
 end
@@ -198,10 +164,70 @@ function commit(vk::VerifierKnowledge, alpha, beta_vec, gamma_vec, phi_vec, psi,
 end
 
 
-function verifier(channel::IOChannel, rng::AbstractRNG, vk::VerifierKnowledge)
+struct MainPayload1
+    w :: G
+end
 
-    w = take!(channel)
 
+struct MainPayload2
+    alpha :: Zp
+    beta_vec :: Array{Zp, 1}
+    gamma_vec :: Array{Zp, 1}
+    phi_vec :: Array{Zp, 1}
+    psi :: Zp
+end
+
+
+struct ProverMainIntermediateState
+    s1_vec :: BitArray
+    s2_vec :: BitArray
+    rho :: Zp
+end
+
+
+function prover_main_stage1(rng::AbstractRNG, pk::ProverKnowledge)
+    vk = pk.verifier_knowledge
+
+    R1, R2 = find_residuals(vk.A, pk.S, vk.T)
+
+    s_vec = serialize(pk.S)
+    r1_vec = serialize(R1)
+    r2_vec = serialize(R2)
+
+    s1_vec = vcat(binary(s_vec, vk.b), binary(r1_vec, vk.b1), binary(r2_vec, vk.b2))
+    s2_vec = xor.(s1_vec, ones(eltype(s1_vec), length(s1_vec)))
+
+    rho = rand_Zp(rng)
+
+    w = exp_to_bool_vec(vk.g_vec, s2_vec) * exp_to_bool_vec(vk.h_vec, s1_vec) * vk.u^rho
+
+    payload = MainPayload1(w)
+    state = ProverMainIntermediateState(s1_vec, s2_vec, rho)
+
+    payload, state
+end
+
+
+function prover_main_stage2(
+        pk::ProverKnowledge, state::ProverMainIntermediateState,
+        payload1::MainPayload1, payload2::MainPayload2)
+
+    vk = pk.verifier_knowledge
+
+    v_vec, t, g_vec_prime = commit(
+        vk, payload2.alpha, payload2.beta_vec, payload2.gamma_vec, payload2.phi_vec,
+        payload2.psi, payload1.w)
+
+    v1_vec = v_vec .+ mul_by_bool_vec(payload2.phi_vec, state.s2_vec) .+ payload2.phi_vec .* payload2.psi
+    v2_vec = convert.(Zp, state.s1_vec) .+ payload2.psi
+    x = v1_vec' * v2_vec
+
+    vk = VerifierKnowledgeInnerProduct(g_vec_prime, vk.h_vec, vk.u, t, x)
+    ProverKnowledgeInnerProduct(vk, v1_vec, v2_vec, state.rho)
+end
+
+
+function verifier_main_stage1(rng::AbstractRNG, vk::VerifierKnowledge)
     n, m = size(vk.A)
     n, k = size(vk.T)
 
@@ -211,15 +237,46 @@ function verifier(channel::IOChannel, rng::AbstractRNG, vk::VerifierKnowledge)
     phi_vec = [rand_Zp_nonzero(rng) for i in 1:vk.l]
     psi = rand_Zp_nonzero(rng)
 
-    put!(channel, (alpha, beta_vec, gamma_vec, phi_vec, psi))
+    MainPayload2(alpha, beta_vec, gamma_vec, phi_vec, psi)
+end
 
-    v_vec, t, g_vec_prime = commit(vk, alpha, beta_vec, gamma_vec, phi_vec, psi, w)
+
+function verifier_main_stage2(vk::VerifierKnowledge, payload1::MainPayload1, payload2::MainPayload2)
+    v_vec, t, g_vec_prime = commit(
+        vk, payload2.alpha, payload2.beta_vec, payload2.gamma_vec, payload2.phi_vec,
+        payload2.psi, payload1.w)
 
     x = (
-        gamma_vec' * apply.(to_zp.(vk.T), alpha) * beta_vec +
-        psi * sum(v_vec) +
-        (psi + psi^2) * sum(phi_vec))
+        payload2.gamma_vec' * apply.(to_zp.(vk.T), payload2.alpha) * payload2.beta_vec +
+        payload2.psi * sum(v_vec) +
+        (payload2.psi + payload2.psi^2) * sum(payload2.phi_vec))
 
-    vk = VerifierKnowledgeInnerProduct(g_vec_prime, vk.h_vec, vk.u, t, x)
-    verifier_inner_product(channel, rng, vk)
+    VerifierKnowledgeInnerProduct(g_vec_prime, vk.h_vec, vk.u, t, x)
+end
+
+
+function main_synchronous(rng::AbstractRNG, pk::ProverKnowledge, vk::VerifierKnowledge)
+    payload1, state = prover_main_stage1(rng, pk)
+    payload2 = verifier_main_stage1(rng, vk)
+    pk_ip = prover_main_stage2(pk, state, payload1, payload2)
+    vk_ip = verifier_main_stage2(vk, payload1, payload2)
+    inner_product_synchronous(rng, pk_ip, vk_ip)
+end
+
+
+function prover_main_actor(channel::IOChannel, rng::AbstractRNG, pk::ProverKnowledge)
+    payload1, state = prover_main_stage1(rng, pk)
+    put!(channel, payload1)
+    payload2 = take!(channel)
+    pk_ip = prover_main_stage2(pk, state, payload1, payload2)
+    prover_inner_product_actor(channel, rng, pk_ip)
+end
+
+
+function verifier_main_actor(channel::IOChannel, rng::AbstractRNG, vk::VerifierKnowledge)
+    payload1 = take!(channel)
+    payload2 = verifier_main_stage1(rng, vk)
+    put!(channel, payload2)
+    vk_ip = verifier_main_stage2(vk, payload1, payload2)
+    verifier_inner_product_actor(channel, rng, vk_ip)
 end
