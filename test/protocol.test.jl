@@ -23,7 +23,7 @@ end
     v1 = [rand_Zp(rng) for i in 1:l]
     v2 = [rand_Zp(rng) for i in 1:l]
     rho = rand_Zp(rng)
-    t = prod(g .^ v1) * prod(h .^ v2) * u^rho
+    t = sum(g .* v1) + sum(h .* v2) + u * rho
     x = v1' * v2
 
     vk = LogProof.VerifierKnowledgeInnerProduct(g, h, u, t, x)
@@ -50,7 +50,7 @@ end
     v1 = [rand_Zp(rng) for i in 1:l]
     v2 = [rand_Zp(rng) for i in 1:l]
     rho = rand_Zp(rng)
-    t = prod(g .^ v1) * prod(h .^ v2) * a^(v1' * v2) * u^rho
+    t = sum(g .* v1) + sum(h .* v2) + a * (v1' * v2) + u * rho
 
     vk = LogProof.VerifierKnowledgeFolding(g, h, a, u, t)
     pk = LogProof.ProverKnowledgeFolding(vk, v1, v2, rho)
@@ -63,7 +63,7 @@ end
             (rng, pk), (rng, vk))
     end
 
-    @assert vkf.t_prime == vkf.g^pkf.v1 * vkf.h^pkf.v2 * vkf.a^(pkf.v1 * pkf.v2) * vkf.u^(pkf.rho_prime)
+    @assert vkf.t_prime == vkf.g * pkf.v1 + vkf.h * pkf.v2 + vkf.a * (pkf.v1 * pkf.v2) + vkf.u * (pkf.rho_prime)
 end
 
 

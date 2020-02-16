@@ -1,16 +1,15 @@
 const q = UInt64(251)
 const Zq = ModUInt{UInt64, q}
 
-const p = secp256k1_order # 0xffffffff00000001
-const Zp = ModUInt{secp256k1_base_type, p} # ModUInt{UInt64, p}
+const p = convert(MLUInt{4, UInt64}, curve_order(Curve_secp256k1))
+const Zp = ModUInt{MLUInt{4, UInt64}, p}
 
 # in the centered representation the range of Z* is [-half_mod, half_mod]
 half_mod(::Type{Zq}) = convert(Zq, q >> 1)
 half_mod(::Type{Zp}) = convert(Zp, p >> 1)
 
-#const G = Zp
-const G = Point{secp256k1_type}
-const G_lazy = LazyPoint{secp256k1_type, Zp}
+const _stp = curve_scalar_type(Curve_secp256k1, MgModUInt, MLUInt{4, UInt64})
+const G = ChudnovskyPoint{Curve_secp256k1, _stp}
 
 const Rq = Polynomial{Zq}
 const d = 8
@@ -77,10 +76,9 @@ end
 
 
 function rand_G(rng)
-    tp = eltype(secp256k1_type)
-    res = Zp(rand_mp(rng, one(tp), p), DarkIntegers._verbatim)
-    #secp256k1_base^res
-    instantiate(LazyPoint(secp256k1_curve, res))
+    tp = MLUInt{4, UInt64}
+    res = rand_mp(rng, one(tp), p)
+    base_mul(G, res)
 end
 
 

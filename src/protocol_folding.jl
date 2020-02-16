@@ -14,8 +14,8 @@ struct VerifierKnowledgeFolding
         l = length(g_vec)
         np2 = next_power_of_2(l)
         if np2 != l
-            g_vec = [g_vec; [one(G) for i in 1:(np2-l)]]
-            h_vec = [h_vec; [one(G) for i in 1:(np2-l)]]
+            g_vec = [g_vec; [zero(G) for i in 1:(np2-l)]]
+            h_vec = [h_vec; [zero(G) for i in 1:(np2-l)]]
         end
 
         new(g_vec, h_vec, a, u, t)
@@ -69,9 +69,9 @@ function fold_commitment(vk::VerifierKnowledgeFolding, t_minus1::G, t_1::G, c::Z
     g_t_vec, g_b_vec = halves(vk.g_vec)
     h_t_vec, h_b_vec = halves(vk.h_vec)
 
-    g_prime_vec = g_t_vec .* g_b_vec.^c
-    h_prime_vec = h_t_vec .* h_b_vec.^inv(c)
-    t_pprime = t_minus1^inv(c) * vk.t * t_1^c
+    g_prime_vec = g_t_vec .+ g_b_vec .* c
+    h_prime_vec = h_t_vec .+ h_b_vec .* inv(c)
+    t_pprime = t_minus1 * inv(c) + vk.t + t_1 * c
 
     VerifierKnowledgeFolding(g_prime_vec, h_prime_vec, vk.a, vk.u, t_pprime)
 end
@@ -131,16 +131,16 @@ function prover_folding_stage1(rng, pk::ProverKnowledgeFolding)
     sigma_1 = rand_Zp(rng)
 
     t_minus1 = (
-        prod(g_t_vec .^ v1_b_vec)
-        * prod(h_b_vec .^ v2_t_vec)
-        * vk.a^(v1_b_vec' * v2_t_vec)
-        * vk.u^sigma_minus1)
+        sum(g_t_vec .* v1_b_vec)
+        + sum(h_b_vec .* v2_t_vec)
+        + vk.a * (v1_b_vec' * v2_t_vec)
+        + vk.u * sigma_minus1)
 
     t_1 = (
-        prod(g_b_vec .^ v1_t_vec)
-        * prod(h_t_vec .^ v2_b_vec)
-        * vk.a^(v1_t_vec' * v2_b_vec)
-        * vk.u^sigma_1)
+        sum(g_b_vec .* v1_t_vec)
+        + sum(h_t_vec .* v2_b_vec)
+        + vk.a * (v1_t_vec' * v2_b_vec)
+        + vk.u * sigma_1)
 
     state = ProverFoldingIntermediateState(v1_t_vec, v1_b_vec, v2_t_vec, v2_b_vec, sigma_1, sigma_minus1)
     payload = FoldingPayloadStage1(t_1, t_minus1)

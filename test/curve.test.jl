@@ -1,37 +1,86 @@
+using DarkIntegers
+using BenchmarkTools
+
+using LogProof:
+    Curve_secp256k1, curve_scalar_type, AffinePoint, JacobianPoint, ChudnovskyPoint,
+    curve_order, double
+
+
+function benchmark_result(trial)
+    time_str = BenchmarkTools.prettytime(minimum(trial.times))
+
+    if trial.allocs > 0
+        mem_str = BenchmarkTools.prettymemory(trial.memory)
+        alloc_str = ", $mem_str ($(trial.allocs) allocs)"
+    else
+        alloc_str = ""
+    end
+
+    time_str * alloc_str
+end
+
+
+function ref_mul(p, y)
+    res = p
+    for i in 2:y
+        res += p
+    end
+    res
+end
+
+
 @testgroup "Curve" begin
 
 
-@testcase "SECP256k1" begin
+point_types = [AffinePoint, JacobianPoint, ChudnovskyPoint] => ["affine", "Jacobian", "Chudnovsky"]
 
-    # Basically the same SECP256k1 curve defined in `curve.jl`,
-    # but using `MLUInt{8, UInt32}` as the base type
 
-    ml_tp = MLUInt{8, UInt32}
-    m = zero(ml_tp) - 2^32 - 2^9 - 2^8 - 2^7 - 2^6 - 2^4 - 1
+@testcase "SECP256k1" for point_type in point_types
 
-    tp = ModUInt{MLUInt{8, UInt32}, m}
+    stp = curve_scalar_type(Curve_secp256k1, MgModUInt, MLUInt{4, UInt64})
+    ref_ptp = AffinePoint{Curve_secp256k1, stp}
+    ptp = point_type{Curve_secp256k1, stp}
+    order = curve_order(Curve_secp256k1)
 
-    a = zero(tp)
-    b = convert(tp, 7)
-    params = LogProof.CurveParams{tp}(a, b)
+    b = one(ptp)
+    b_ref = one(ref_ptp)
 
-    base = LogProof.Point{tp}(
-        params,
-        ml_tp(reverse((
-            0x79BE667E, 0xF9DCBBAC, 0x55A06295, 0xCE870B07,
-            0x029BFCDB, 0x2DCE28D9, 0x59F2815B, 0x16F81798))),
-        ml_tp(reverse((
-            0x483ADA77, 0x26A3C465, 0x5DA4FBFC, 0x0E1108A8,
-            0xFD17B448, 0xA6855419, 0x9C47D08F, 0xFB10D4B8))))
-    order = ml_tp(reverse((
-        0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFE,
-        0xBAAEDCE6, 0xAF48A03B, 0xBFD25E8C, 0xD0364141)))
+    # Trivial tests for point_type == AffinePoint
+    @test double(b) == convert(ptp, double(b_ref))
+    @test b + b == convert(ptp, b_ref + b_ref)
+    @test double(b) + b == convert(ptp, double(b_ref) + b_ref)
 
-    order_bi = as_builtin(order)
+    @test ref_mul(b + b, 23) == (b + b) * 23
+    @test iszero(b * (order - 1) + b)
+    @test iszero(b * order)
+    @test b * (order + 1) == b
+end
 
-    @test (base^(order_bi - 1) * base).inf
-    @test (base^order_bi).inf
-    @test base^(order_bi + 1) == base
+
+@testcase "SECP256k1, addition performance" for point_type in point_types
+
+    stp = curve_scalar_type(Curve_secp256k1, MgModUInt, MLUInt{4, UInt64})
+    ptp = point_type{Curve_secp256k1, stp}
+
+    b1 = one(ptp)
+    b2 = double(b1)
+    b4 = double(b2)
+
+    trial = @benchmark $b2 + $b4
+    @test_result benchmark_result(trial)
+end
+
+
+@testcase "SECP256k1, multiplication performance" for point_type in point_types
+
+    stp = curve_scalar_type(Curve_secp256k1, MgModUInt, MLUInt{4, UInt64})
+    ptp = point_type{Curve_secp256k1, stp}
+
+    b1 = one(ptp)
+    b2 = double(b1)
+
+    trial = @benchmark $b2 * 1234567
+    @test_result benchmark_result(trial)
 end
 
 

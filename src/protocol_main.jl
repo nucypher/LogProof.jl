@@ -111,10 +111,10 @@ end
 
 function exp_to_bool_vec(a::Array{T, 1}, v::BitArray{1}) where T
     @assert length(a) == length(v)
-    res = one(T)
+    res = zero(T)
     for i in 1:length(a)
         if v[i]
-            res *= a[i]
+            res += a[i]
         end
     end
     res
@@ -139,7 +139,8 @@ end
 
 
 function commit(vk::VerifierKnowledge, alpha, beta_vec, gamma_vec, phi_vec, psi, w)
-    g_vec_prime = vk.g_vec.^inv.(phi_vec)
+    inverses = inv.(phi_vec)
+    g_vec_prime = vk.g_vec .* inverses
 
     v_vec = vcat(
         outer(
@@ -158,7 +159,7 @@ function commit(vk::VerifierKnowledge, alpha, beta_vec, gamma_vec, phi_vec, psi,
             powers(alpha, d - 1),
             powers_of_2(Zp, vk.b2)))
 
-    t = w * prod(g_vec_prime.^(v_vec .+ psi * phi_vec)) * prod(vk.h_vec.^psi)
+    t = w + sum(g_vec_prime .* (v_vec .+ psi * phi_vec)) + sum(vk.h_vec .* psi)
 
     v_vec, t, g_vec_prime
 end
@@ -199,7 +200,7 @@ function prover_main_stage1(rng::AbstractRNG, pk::ProverKnowledge)
 
     rho = rand_Zp(rng)
 
-    w = exp_to_bool_vec(vk.g_vec, s2_vec) * exp_to_bool_vec(vk.h_vec, s1_vec) * vk.u^rho
+    w = exp_to_bool_vec(vk.g_vec, s2_vec) + exp_to_bool_vec(vk.h_vec, s1_vec) + vk.u * rho
 
     payload = MainPayload1(w)
     state = ProverMainIntermediateState(s1_vec, s2_vec, rho)
