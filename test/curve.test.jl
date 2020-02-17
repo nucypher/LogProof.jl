@@ -71,7 +71,12 @@ end
 end
 
 
-@testcase "SECP256k1, multiplication performance" for point_type in point_types
+mul_funcs = (
+    [LogProof.mul_double_and_add, LogProof.mul_windowed, LogProof.mul_sliding_window, LogProof.mul_wnaf]
+    => ["double-and-add", "windowed", "sliding window", "wNAF"])
+
+
+@testcase "SECP256k1, multiplication performance" for point_type in point_types, func in mul_funcs
 
     stp = curve_scalar_type(Curve_secp256k1, MgModUInt, MLUInt{4, UInt64})
     ptp = point_type{Curve_secp256k1, stp}
@@ -79,7 +84,10 @@ end
     b1 = one(ptp)
     b2 = double(b1)
 
-    trial = @benchmark $b2 * 1234567
+    x_bi = 115047236638587805833081834189719086745649315857841928574581145752217906325686
+    x = convert(MLUInt{4, UInt64}, x_bi)
+
+    trial = @benchmark $func($b2, $x)
     @test_result benchmark_result(trial)
 end
 

@@ -78,7 +78,7 @@ end
 function rand_G(rng)
     tp = MLUInt{4, UInt64}
     res = rand_mp(rng, one(tp), p)
-    base_mul(G, res)
+    one(G) * res
 end
 
 
