@@ -9,7 +9,7 @@ half_mod(::Type{Zq}) = convert(Zq, q >> 1)
 half_mod(::Type{Zp}) = convert(Zp, p >> 1)
 
 const _stp = curve_scalar_type(Curve_secp256k1, MgModUInt, MLUInt{4, UInt64})
-const G = ChudnovskyPoint{Curve_secp256k1, _stp}
+const G = JacobianPoint{Curve_secp256k1, _stp}
 
 const Rq = Polynomial{Zq}
 const d = 8
