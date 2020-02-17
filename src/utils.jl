@@ -140,11 +140,12 @@ function binary(val::T, b::Int) where T <: Union{Zq, Zp}
     # Note that we're getting numbers in Zq or Zp, (with possibly 2^b>q)
     # but the resulting contract must be valid in Zp
     # TODO: (issue #1) performance can be improved
-    is_negative = val > half_mod(T)
+    x = value(val)
+    is_negative = x > value(half_mod(T))
     if is_negative
         val += 1 << (b-1) # adding an offset and treating it as a positive number
+        x = value(val)
     end
-    x = value(val)
     res = BitArray{1}(undef, b)
     for i in 1:(b-1)
         res[i] = isodd(x)
