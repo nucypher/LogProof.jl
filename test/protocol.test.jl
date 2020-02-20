@@ -1,19 +1,20 @@
 using LogProof: rand_point
 
 
-function rand_Zq_polynomial(rng::AbstractRNG, params::Params{Zq, Zp, G}, B::Int=0) where {Zq, Zp, G}
-    Polynomial([rand_around_zero(rng, Zq, B) for i in 1:params.d], negacyclic_modulus)
+function rand_Zq_polynomial(
+        rng::AbstractRNG, params::Params{Zq, Zp, G}, d::Int, B::Int=0) where {Zq, Zp, G}
+    Polynomial([rand_around_zero(rng, Zq, B) for i in 1:d], negacyclic_modulus)
 end
 
 
-function make_A(rng::AbstractRNG, params::Params, rows::Int, cols::Int)
-    [rand_Zq_polynomial(rng, params) for i in 1:rows, j in 1:cols]
+function make_A(rng::AbstractRNG, params::Params, d::Int, rows::Int, cols::Int)
+    [rand_Zq_polynomial(rng, params, d) for i in 1:rows, j in 1:cols]
 end
 
 
-function make_S(rng::AbstractRNG, params::Params, rows::Int, cols::Int, B::Int)
+function make_S(rng::AbstractRNG, params::Params, d::Int, rows::Int, cols::Int, B::Int)
     [
-        broadcast_into_polynomial(-, rand_Zq_polynomial(rng, params, 2 * B), unsigned(B))
+        broadcast_into_polynomial(-, rand_Zq_polynomial(rng, params, d, 2 * B), unsigned(B))
         for i in 1:rows, j in 1:cols]
 end
 
@@ -27,7 +28,7 @@ get_test_types(params::Params{Zq, Zp, G}) where {Zq, Zp, G} = Zp, G
 @testcase "Inner product" for synchronous in ([false, true] => ["actors", "synchronous"])
     rng = MersenneTwister(123)
 
-    params = Params(251, 8)
+    params = Params(251)
     Zp, G = get_test_types(params)
 
     l = 201
@@ -56,7 +57,7 @@ end
 @testcase "Folding" for synchronous in ([false, true] => ["actors", "synchronous"])
     rng = MersenneTwister(123)
 
-    params = Params(251, 8)
+    params = Params(251)
     Zp, G = get_test_types(params)
 
     l = 8
@@ -86,7 +87,7 @@ end
 
 @testcase "Main" for synchronous in ([false, true] => ["actors", "synchronous"])
 
-    params = Params(251, 8)
+    params = Params(251)
 
     n = 2
     m = 3
@@ -95,8 +96,8 @@ end
 
     rng = MersenneTwister(123)
 
-    A = make_A(rng, params, n, m)
-    S = make_S(rng, params, m, k, B)
+    A = make_A(rng, params, 8, n, m)
+    S = make_S(rng, params, 8, m, k, B)
 
     T = A * S
 

@@ -1,4 +1,11 @@
-using Base.Iterators: product
+# Returns the negacyclic modulus (x^N+1) as a polynomial of length 2N
+# TODO: cannot get the modulus from the type system at the moment
+function extended_poynomial_modulus(::Type{Polynomial{T, N}}) where {T, N}
+    f_coeffs = [one(T), zeros(T, N-1)..., one(T), zeros(T, N-1)...]
+    # The modulus here does not matter since it's the extended length and we won't get over it.
+    # Therefore just using `negacyclic_modulus` instead of `polynomial_modulus`
+    Polynomial(f_coeffs, negacyclic_modulus)
+end
 
 
 struct VerifierKnowledge{Zq, Zp, G}
@@ -18,16 +25,23 @@ struct VerifierKnowledge{Zq, Zp, G}
             rng, params::Params{Zq, Zp, G}, A::Array{P, 2}, T::Array{P, 2}, B::Int
             ) where {Zq, Zp, G, P <: Polynomial{Zq, N}} where N
 
+        # TODO: cannot enforce it with type system at the moment
+        # Hardcoding for now
+        @assert all(x.modulus == negacyclic_modulus for x in A)
+        @assert all(x.modulus == negacyclic_modulus for x in T)
+
+        # The infinity norm of the negacyclic modulus that we use is just 1.
+        polynomial_modulus_norm = 1
+
         n, m = size(A)
         n, k = size(T)
 
-        d = params.d
         q = as_builtin(modulus(Zq))
 
         b = ceil(Int, log2(B)) + 1
-        b1 = ceil(Int, log2(m * d * B + d * params.f_norm))
+        b1 = ceil(Int, log2(m * N * B + N * polynomial_modulus_norm))
         b2 = ceil(Int, log2(q))
-        l = m * k * d * b + n * k * (2 * d - 1) * b1 + n * k * (d - 1) * b2
+        l = m * k * N * b + n * k * (2 * N - 1) * b1 + n * k * (N - 1) * b2
 
         g_vec = [rand_point(rng, G) for i in 1:l]
         h_vec = [rand_point(rng, G) for i in 1:l]
@@ -41,6 +55,16 @@ end
 struct ProverKnowledge{Zq, Zp, G}
     verifier_knowledge :: VerifierKnowledge{Zq, Zp, G}
     S :: Array{<:Polynomial{Zq}, 2}
+
+    function ProverKnowledge(
+            verifier_knowledge::VerifierKnowledge{Zq, Zp, G}, S::Array{<:Polynomial{Zq}, 2}
+            ) where {Zq, Zp, G}
+
+        # TODO: cannot enforce it with type system at the moment
+        @assert all(x.modulus == negacyclic_modulus for x in S)
+
+        new{Zq, Zp, G}(verifier_knowledge, S)
+    end
 end
 
 
@@ -64,13 +88,6 @@ function central(x::AbstractModUInt{T, M}) where {T, M}
     x_bi = convert(BigInt, value(x))
     p_bi = convert(BigInt, M)
     x_bi > p_bi ÷ 2 ? (x_bi - p_bi) : x_bi
-end
-
-
-# Returns the negacyclic modulus (x^N+1) as a polynomial of length 2N
-function extended_poynomial_modulus(::Type{Polynomial{T, N}}) where {T, N}
-    f_coeffs = [one(T), zeros(T, N-1)..., one(T), zeros(T, N-1)...]
-    Polynomial(f_coeffs, negacyclic_modulus)
 end
 
 

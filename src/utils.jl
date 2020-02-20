@@ -1,11 +1,6 @@
 struct Params{Zq <: AbstractModUInt, Zp <: AbstractModUInt, G}
 
-    d :: Int # polynomial length
-
-    f_norm :: Int # maximum absolute value of all of the coefficients of the polynomial modulus `f`
-    #Rq :: Type{Polynomial} # polynomial type
-
-    function Params(q::Int, d::Int, point_coords::Type=JacobianPoint)
+    function Params(q::Int, point_coords::Type=JacobianPoint)
         q_tp = UInt64
         Zq = ModUInt{q_tp, convert(q_tp, q)}
 
@@ -26,7 +21,7 @@ struct Params{Zq <: AbstractModUInt, Zp <: AbstractModUInt, G}
 
         f_norm = 1 # we're using negacyclic polynomials, so it is the norm of `x^N + 1`
 
-        new{Zq, Zp, G}(d, f_norm)
+        new{Zq, Zp, G}()
     end
 end
 
