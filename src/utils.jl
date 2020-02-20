@@ -1,54 +1,59 @@
-const q = UInt64(251)
-const Zq = ModUInt{UInt64, q}
+struct Params{Zq <: AbstractModUInt, Zp <: AbstractModUInt, G}
 
-const p = convert(MLUInt{4, UInt64}, curve_order(Curve_secp256k1))
-const Zp = ModUInt{MLUInt{4, UInt64}, p}
+    d :: Int # polynomial length
+
+    f_norm :: Int # maximum absolute value of all of the coefficients of the polynomial modulus `f`
+    #Rq :: Type{Polynomial} # polynomial type
+
+    function Params(q::Int, d::Int, point_coords::Type=JacobianPoint)
+        q_tp = UInt64
+        Zq = ModUInt{q_tp, convert(q_tp, q)}
+
+        curve = Curve_secp256k1
+
+        p_tp = MLUInt{4, UInt64}
+        p = convert(p_tp, curve_order(curve))
+        Zp = ModUInt{p_tp, convert(p_tp, p)}
+
+        # p is prime, so NTT multiplication will be used automatically,
+        # and finding a generator for a 256-bit prime takes a long time.
+        # Use Karatsuba for simplicity.
+        @eval DarkIntegers.known_polynomial_mul_function(
+            ::Type{$Zp}, ::Val{N}, ::DarkIntegers.NegacyclicModulus) where N = DarkIntegers.karatsuba_mul
+
+        curve_tp = curve_scalar_type(curve, MgModUInt, p_tp)
+        G = point_coords{curve, curve_tp}
+
+        f_norm = 1 # we're using negacyclic polynomials, so it is the norm of `x^N + 1`
+
+        new{Zq, Zp, G}(d, f_norm)
+    end
+end
+
 
 # in the centered representation the range of Z* is [-half_mod, half_mod]
-half_mod(::Type{Zq}) = convert(Zq, q >> 1)
-half_mod(::Type{Zp}) = convert(Zp, p >> 1)
-
-const _stp = curve_scalar_type(Curve_secp256k1, MgModUInt, MLUInt{4, UInt64})
-const G = JacobianPoint{Curve_secp256k1, _stp}
-
-const Rq = Polynomial{Zq}
-const d = 8
-const f_norm = 1 # maximum absolute value of all of coefficients of `f`
+half_mod(::Type{T}) where T <: AbstractModUInt = convert(T, modulus(T) >> 1)
 
 
-# For faster start up
-DarkIntegers.known_isprime(::Val{p}) = false
-
-
-# Polynomial x^d + 1 for use in find_residuals()
-const f_exp = Polynomial(
-    convert.(Zp, vcat([1], zeros(Int, d-1), [1], zeros(Int, d-1))), negacyclic_modulus)
-
-
-function rand_Zq(rng, B::Int=0)
-    tp = encompassing_type(Zq)
+function rand_around_zero(rng::AbstractRNG, ::Type{Z}, B::Int=0) where Z <: AbstractModUInt{T, M} where {T, M}
     if B == 0
-        res = rand(rng, zero(tp):(convert(tp, q) - one(tp)))
+        res = rand(rng, zero(T):(M - one(T)))
     else
-        res = rand(rng, zero(tp):(convert(tp, B) - one(tp)))
+        # TODO: or is it supposed to be the range (-B, B)?
+        res = rand(rng, zero(T):(convert(T, B) - one(T)))
     end
-    convert(Zq, res)
+    convert(Z, res)
 end
 
 
-function rand_Zq_polynomial(rng::AbstractRNG, B::Int=0)
-    Polynomial([rand_Zq(rng, B) for i in 1:d], negacyclic_modulus)
-end
-
-
-function rand_mp(rng, ::Type{MLUInt{N, T}}) where {N, T}
+function Base.rand(rng::AbstractRNG, ::Type{MLUInt{N, T}}) where {N, T}
     MLUInt{N, T}(tuple((rand(rng, T) for i in 1:N)...))
 end
 
 
-function rand_mp(rng, a::MLUInt{N, T}, b::MLUInt{N, T}) where {N, T}
+function Base.rand(rng::AbstractRNG, a::MLUInt{N, T}, b::MLUInt{N, T}) where {N, T}
     while true
-        res = rand_mp(rng, MLUInt{N, T})
+        res = rand(rng, MLUInt{N, T})
         if res <= b && (a == zero(MLUInt{N, T}) || res >= a)
             return res
         end
@@ -56,43 +61,34 @@ function rand_mp(rng, a::MLUInt{N, T}, b::MLUInt{N, T}) where {N, T}
 end
 
 
-function rand_Zp(rng, min_val::MgModUInt{T, M}, max_val::MgModUInt{T, M}) where {T, M}
-    MgModUInt{T, M}(rand_mp(rng, min_val.value, max_val.value), DarkIntegers._no_modulo)
+function _rand_moduint(rng::AbstractRNG, ::Type{Z}, min_val::T, max_val::T) where Z <: AbstractModUInt{T, M} where {T, M}
+    # FIXME: this assumes that [min_val, max_val] is close to the full range of T,
+    # otherwise rand() will be very slow.
+    val = rand(rng, min_val, max_val)
+    Z(val, DarkIntegers._verbatim)
 end
 
 
-function rand_Zp(rng)
-    tp = eltype(Zp)
-    m = modulus(Zp)
-    Zp(rand_mp(rng, zero(tp), m - one(tp)), DarkIntegers._verbatim)
+function Base.rand(rng::AbstractRNG, ::Type{Z}) where Z <: AbstractModUInt{T, M} where {T, M}
+    _rand_moduint(rng, Z, zero(T), M - one(T))
 end
 
 
-function rand_Zp_nonzero(rng)
-    tp = eltype(Zp)
-    m = modulus(Zp)
-    Zp(rand_mp(rng, one(tp), m - one(tp)), DarkIntegers._verbatim)
+function rand_nonzero(rng::AbstractRNG, ::Type{Z}) where Z <: AbstractModUInt{T, M} where {T, M}
+    _rand_moduint(rng, Z, one(T), M - one(T))
 end
 
 
-function rand_G(rng)
-    tp = MLUInt{4, UInt64}
-    res = rand_mp(rng, one(tp), p)
-    one(G) * res
-end
-
-
-# Convert a polynomial on a ring to a polynomial with coefficients in Z and double length
-# (so that multiplication result fit in)
-function expand(p::Rq)
-    resize(Polynomial(convert.(Zp, p.coeffs), p.modulus), 2 * length(p.coeffs))
+function rand_point(rng::AbstractRNG, ::Type{G}) where G <: EllipticCurvePoint{C, Z} where {C, Z <: AbstractModUInt}
+    res = rand(rng, Z)
+    one(G) * res + one(G)
 end
 
 
 # returns the degree of the polynomial
 # (index of the maximum power of X with nonzero coefficient minus 1)
-function polynomial_degree(p::Polynomial{T}) where T
-    res = findlast(x -> x != zero(T), p.coeffs)
+function polynomial_degree(p::Polynomial)
+    res = findlast(x -> !iszero(x), p.coeffs)
     if !(res === nothing)
         res - 1
     else
@@ -101,10 +97,10 @@ function polynomial_degree(p::Polynomial{T}) where T
 end
 
 
-function Base.divrem(p::Polynomial, f::Polynomial)
+function Base.divrem(p::Polynomial{T}, f::Polynomial{T}) where T
 
     r = copy(p)
-    r.coeffs .= 0
+    r.coeffs .= zero(T)
 
     f_deg = polynomial_degree(f)
 
@@ -136,7 +132,7 @@ Base.copy(p::Polynomial) = Polynomial(copy(p.coeffs), p.modulus)
 Convert a number `z in [2^(b-1), 2^(b-1))` to its binary representation such that
 `z = z_0 + z_1 * 2 + z_2 * 2^2 + ... + z_{b-2} * 2^(b-2) - z_{b-1} * 2^(b-1)`
 """
-function binary(val::T, b::Int) where T <: Union{Zq, Zp}
+function binary(val::T, b::Int) where T <: AbstractModUInt
     # Note that we're getting numbers in Zq or Zp, (with possibly 2^b>q)
     # but the resulting contract must be valid in Zp
     # TODO: (issue #1) performance can be improved

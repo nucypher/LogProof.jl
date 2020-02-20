@@ -3,14 +3,16 @@ function next_power_of_2(x)
 end
 
 
-struct VerifierKnowledgeFolding
+struct VerifierKnowledgeFolding{Zp <: AbstractModUInt, G <: EllipticCurvePoint}
     g_vec :: Array{G, 1}
     h_vec :: Array{G, 1}
     a :: G
     u :: G
     t :: G
 
-    function VerifierKnowledgeFolding(g_vec, h_vec, a, u, t)
+    function VerifierKnowledgeFolding(
+            ::Type{Zp}, g_vec::Array{G, 1}, h_vec::Array{G, 1}, a::G, u::G, t::G) where {Zp, G}
+
         l = length(g_vec)
         np2 = next_power_of_2(l)
         if np2 != l
@@ -18,18 +20,21 @@ struct VerifierKnowledgeFolding
             h_vec = [h_vec; [zero(G) for i in 1:(np2-l)]]
         end
 
-        new(g_vec, h_vec, a, u, t)
+        new{Zp, G}(g_vec, h_vec, a, u, t)
     end
 end
 
 
-struct ProverKnowledgeFolding
-    verifier_knowledge :: VerifierKnowledgeFolding
+struct ProverKnowledgeFolding{Zp, G}
+    verifier_knowledge :: VerifierKnowledgeFolding{Zp, G}
     v1_vec :: Array{Zp, 1}
     v2_vec :: Array{Zp, 1}
     rho :: Zp
 
-    function ProverKnowledgeFolding(vk, v1_vec, v2_vec, rho)
+    function ProverKnowledgeFolding(
+            vk::VerifierKnowledgeFolding{Zp, G},
+            v1_vec::Array{Zp, 1}, v2_vec::Array{Zp, 1}, rho::Zp) where {Zp, G}
+
         l = length(v1_vec)
         np2 = next_power_of_2(l)
         if np2 != l
@@ -37,12 +42,12 @@ struct ProverKnowledgeFolding
             v2_vec = [v2_vec; [zero(Zp) for i in 1:(np2-l)]]
         end
 
-        new(vk, v1_vec, v2_vec, rho)
+        new{Zp, G}(vk, v1_vec, v2_vec, rho)
     end
 end
 
 
-struct FoldedVerifierKnowledge
+struct FoldedVerifierKnowledge{G <: EllipticCurvePoint}
     g :: G
     h :: G
     a :: G
@@ -51,8 +56,8 @@ struct FoldedVerifierKnowledge
 end
 
 
-struct FoldedProverKnowledge
-    verifier_knowledge :: FoldedVerifierKnowledge
+struct FoldedProverKnowledge{Zp <: AbstractModUInt, G}
+    verifier_knowledge :: FoldedVerifierKnowledge{G}
     v1 :: Zp
     v2 :: Zp
     rho_prime :: Zp
@@ -65,7 +70,7 @@ function halves(v::Array{T, 1}) where T
 end
 
 
-function fold_commitment(vk::VerifierKnowledgeFolding, t_minus1::G, t_1::G, c::Zp)
+function fold_commitment(vk::VerifierKnowledgeFolding{Zp, G}, t_minus1::G, t_1::G, c::Zp) where {Zp, G}
     g_t_vec, g_b_vec = halves(vk.g_vec)
     h_t_vec, h_b_vec = halves(vk.h_vec)
 
@@ -73,17 +78,17 @@ function fold_commitment(vk::VerifierKnowledgeFolding, t_minus1::G, t_1::G, c::Z
     h_prime_vec = h_t_vec .+ h_b_vec .* inv(c)
     t_pprime = t_minus1 * inv(c) + vk.t + t_1 * c
 
-    VerifierKnowledgeFolding(g_prime_vec, h_prime_vec, vk.a, vk.u, t_pprime)
+    VerifierKnowledgeFolding(Zp, g_prime_vec, h_prime_vec, vk.a, vk.u, t_pprime)
 end
 
 
-struct FoldingPayloadStage1
+struct FoldingPayloadStage1{G}
     t_1 :: G
     t_minus1 :: G
 end
 
 
-struct FoldingPayloadStage2
+struct FoldingPayloadStage2{Zp}
     c :: Zp
 end
 
@@ -109,7 +114,7 @@ function finalize_folding(pk::ProverKnowledgeFolding)
 end
 
 
-struct ProverFoldingIntermediateState
+struct ProverFoldingIntermediateState{Zp}
     v1_t_vec :: Array{Zp, 1}
     v1_b_vec :: Array{Zp, 1}
     v2_t_vec :: Array{Zp, 1}
@@ -119,7 +124,7 @@ struct ProverFoldingIntermediateState
 end
 
 
-function prover_folding_stage1(rng, pk::ProverKnowledgeFolding)
+function prover_folding_stage1(rng, pk::ProverKnowledgeFolding{Zp, G}) where {Zp, G}
     vk = pk.verifier_knowledge
 
     g_t_vec, g_b_vec = halves(vk.g_vec)
@@ -127,8 +132,8 @@ function prover_folding_stage1(rng, pk::ProverKnowledgeFolding)
     v1_t_vec, v1_b_vec = halves(pk.v1_vec)
     v2_t_vec, v2_b_vec = halves(pk.v2_vec)
 
-    sigma_minus1 = rand_Zp(rng)
-    sigma_1 = rand_Zp(rng)
+    sigma_minus1 = rand(rng, Zp)
+    sigma_1 = rand(rng, Zp)
 
     t_minus1 = (
         sum(g_t_vec .* v1_b_vec)
@@ -167,8 +172,8 @@ function prover_folding_stage2(
 end
 
 
-function verifier_folding_stage1(rng)
-    c = rand_Zp_nonzero(rng)
+function verifier_folding_stage1(rng, ::Type{Zp}) where Zp
+    c = rand_nonzero(rng, Zp)
     FoldingPayloadStage2(c)
 end
 
@@ -180,10 +185,12 @@ function verifier_folding_stage2(
 end
 
 
-function folding_synchronous(rng, pk::ProverKnowledgeFolding, vk::VerifierKnowledgeFolding)
+function folding_synchronous(
+        rng, pk::ProverKnowledgeFolding{Zp, G}, vk::VerifierKnowledgeFolding{Zp, G}) where {Zp, G}
+
     while !is_folded(vk)
         payload1, state = prover_folding_stage1(rng, pk)
-        payload2 = verifier_folding_stage1(rng)
+        payload2 = verifier_folding_stage1(rng, Zp)
 
         pk = prover_folding_stage2(pk, state, payload1, payload2)
         vk = verifier_folding_stage2(vk, payload1, payload2)
@@ -210,14 +217,15 @@ function prover_folding_actor(channel::IOChannel, rng, pk::ProverKnowledgeFoldin
 end
 
 
-function verifier_folding_actor(channel::IOChannel, rng, vk::VerifierKnowledgeFolding)
+function verifier_folding_actor(
+        channel::IOChannel, rng, vk::VerifierKnowledgeFolding{Zp, G}) where {Zp, G}
 
     if is_folded(vk)
         return finalize_folding(vk)
     end
 
     payload1 = take!(channel)
-    payload2 = verifier_folding_stage1(rng)
+    payload2 = verifier_folding_stage1(rng, Zp)
     put!(channel, payload2)
 
     new_vk = verifier_folding_stage2(vk, payload1, payload2)

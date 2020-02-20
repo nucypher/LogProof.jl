@@ -1,4 +1,4 @@
-struct VerifierKnowledgeInnerProduct
+struct VerifierKnowledgeInnerProduct{Zp <: AbstractModUInt, G <: EllipticCurvePoint}
     g_vec :: Array{G, 1}
     h_vec :: Array{G, 1}
     u :: G
@@ -7,38 +7,38 @@ struct VerifierKnowledgeInnerProduct
 end
 
 
-struct ProverKnowledgeInnerProduct
-    verifier_knowledge :: VerifierKnowledgeInnerProduct
+struct ProverKnowledgeInnerProduct{Zp, G}
+    verifier_knowledge :: VerifierKnowledgeInnerProduct{Zp, G}
     v1_vec :: Array{Zp, 1}
     v2_vec :: Array{Zp, 1}
     rho :: Zp
 end
 
 
-struct InnerProductPayload1
+struct InnerProductPayload1{G}
     a :: G
 end
 
 
-struct InnerProductPayload2
+struct InnerProductPayload2{G}
     w :: G
     w_prime :: G
 end
 
 
-struct InnerProductPayload3
+struct InnerProductPayload3{Zp}
     c :: Zp
 end
 
 
-struct InnerProductPayload4
+struct InnerProductPayload4{Zp}
     z1 :: Zp
     z2 :: Zp
     tau :: Zp
 end
 
 
-struct ProverInnerProductIntermediateState
+struct ProverInnerProductIntermediateState{Zp}
     y1 :: Zp
     y2 :: Zp
     sigma :: Zp
@@ -47,7 +47,7 @@ end
 
 
 function prover_inner_product_stage1(
-        pk::ProverKnowledgeInnerProduct, payload1::InnerProductPayload1)
+        pk::ProverKnowledgeInnerProduct{Zp, G}, payload1::InnerProductPayload1{G}) where {Zp, G}
 
     a = payload1.a
 
@@ -55,19 +55,19 @@ function prover_inner_product_stage1(
 
     t_prime = vk.t + a * vk.x
 
-    vk_folding = VerifierKnowledgeFolding(vk.g_vec, vk.h_vec, a, vk.u, t_prime)
+    vk_folding = VerifierKnowledgeFolding(Zp, vk.g_vec, vk.h_vec, a, vk.u, t_prime)
     ProverKnowledgeFolding(vk_folding, pk.v1_vec, pk.v2_vec, pk.rho)
 end
 
 
-function prover_inner_product_stage2(rng, pk_folded::FoldedProverKnowledge)
+function prover_inner_product_stage2(rng, pk_folded::FoldedProverKnowledge{Zp, G}) where {Zp, G}
 
     vk_folded = pk_folded.verifier_knowledge
 
-    y1 = rand_Zp(rng)
-    y2 = rand_Zp(rng)
-    sigma = rand_Zp(rng)
-    sigma_prime = rand_Zp(rng)
+    y1 = rand(rng, Zp)
+    y2 = rand(rng, Zp)
+    sigma = rand(rng, Zp)
+    sigma_prime = rand(rng, Zp)
 
     v1 = pk_folded.v1
     v2 = pk_folded.v2
@@ -106,24 +106,24 @@ function prover_inner_product_stage3(
 end
 
 
-function verifier_inner_product_stage1(rng)
-    InnerProductPayload1(rand_G(rng))
+function verifier_inner_product_stage1(rng, ::Type{G}) where G
+    InnerProductPayload1(rand_point(rng, G))
 end
 
 
 function verifier_inner_product_stage2(
-        vk::VerifierKnowledgeInnerProduct, payload1::InnerProductPayload1)
+        vk::VerifierKnowledgeInnerProduct{Zp, G}, payload1::InnerProductPayload1{G}) where {Zp, G}
 
     a = payload1.a
 
     t_prime = vk.t + a * vk.x
 
-    VerifierKnowledgeFolding(vk.g_vec, vk.h_vec, a, vk.u, t_prime)
+    VerifierKnowledgeFolding(Zp, vk.g_vec, vk.h_vec, a, vk.u, t_prime)
 end
 
 
-function verifier_inner_product_stage3(rng)
-    c = rand_Zp_nonzero(rng)
+function verifier_inner_product_stage3(rng, ::Type{Zp}) where Zp
+    c = rand_nonzero(rng, Zp)
     InnerProductPayload3(c)
 end
 
@@ -152,15 +152,15 @@ end
 
 
 function inner_product_synchronous(
-        rng, pk::ProverKnowledgeInnerProduct, vk::VerifierKnowledgeInnerProduct)
-    payload1 = verifier_inner_product_stage1(rng)
+        rng, pk::ProverKnowledgeInnerProduct{Zp, G}, vk::VerifierKnowledgeInnerProduct{Zp, G}) where {Zp, G}
+    payload1 = verifier_inner_product_stage1(rng, G)
     pk_folding = prover_inner_product_stage1(pk, payload1)
     vk_folding = verifier_inner_product_stage2(vk, payload1)
 
     pkf, vkf = folding_synchronous(rng, pk_folding, vk_folding)
 
     payload2, state = prover_inner_product_stage2(rng, pkf)
-    payload3 = verifier_inner_product_stage3(rng)
+    payload3 = verifier_inner_product_stage3(rng, Zp)
 
     payload4 = prover_inner_product_stage3(state, pkf, payload3)
     verifier_inner_product_stage4(vkf, payload2, payload3, payload4)
@@ -179,13 +179,15 @@ function prover_inner_product_actor(channel::IOChannel, rng, pk::ProverKnowledge
 end
 
 
-function verifier_inner_product_actor(channel::IOChannel, rng, vk::VerifierKnowledgeInnerProduct)
-    payload1 = verifier_inner_product_stage1(rng)
+function verifier_inner_product_actor(
+        channel::IOChannel, rng, vk::VerifierKnowledgeInnerProduct{Zp, G}) where {Zp, G}
+
+    payload1 = verifier_inner_product_stage1(rng, G)
     put!(channel, payload1)
     vk_folding = verifier_inner_product_stage2(vk, payload1)
     vkf = verifier_folding_actor(channel, rng, vk_folding)
     payload2 = take!(channel)
-    payload3 = verifier_inner_product_stage3(rng)
+    payload3 = verifier_inner_product_stage3(rng, Zp)
     put!(channel, payload3)
     payload4 = take!(channel)
     verifier_inner_product_stage4(vkf, payload2, payload3, payload4)

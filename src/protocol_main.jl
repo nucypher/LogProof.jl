@@ -1,9 +1,11 @@
 using Base.Iterators: product
 
 
-struct VerifierKnowledge
-    A :: Array{Rq, 2}
-    T :: Array{Rq, 2}
+struct VerifierKnowledge{Zq, Zp, G}
+    params :: Params{Zq, Zp, G}
+    A :: Array{<:Polynomial{Zq}, 2}
+    T :: Array{<:Polynomial{Zq}, 2}
+    polynomial_degree :: Int
     b :: Int
     b1 :: Int
     b2 :: Int
@@ -12,84 +14,115 @@ struct VerifierKnowledge
     h_vec :: Array{G, 1}
     u :: G
 
-    function VerifierKnowledge(rng, A::Array{<:Rq, 2}, T::Array{<:Rq, 2}, B::Int)
+    function VerifierKnowledge(
+            rng, params::Params{Zq, Zp, G}, A::Array{P, 2}, T::Array{P, 2}, B::Int
+            ) where {Zq, Zp, G, P <: Polynomial{Zq, N}} where N
 
         n, m = size(A)
         n, k = size(T)
 
+        d = params.d
+        q = as_builtin(modulus(Zq))
+
         b = ceil(Int, log2(B)) + 1
-        b1 = ceil(Int, log2(m * d * B + d * f_norm))
+        b1 = ceil(Int, log2(m * d * B + d * params.f_norm))
         b2 = ceil(Int, log2(q))
         l = m * k * d * b + n * k * (2 * d - 1) * b1 + n * k * (d - 1) * b2
 
-        g_vec = [rand_G(rng) for i in 1:l]
-        h_vec = [rand_G(rng) for i in 1:l]
-        u = rand_G(rng)
+        g_vec = [rand_point(rng, G) for i in 1:l]
+        h_vec = [rand_point(rng, G) for i in 1:l]
+        u = rand_point(rng, G)
 
-        new(A, T, b, b1, b2, l, g_vec, h_vec, u)
+        new{Zq, Zp, G}(params, A, T, N, b, b1, b2, l, g_vec, h_vec, u)
     end
 end
 
 
-struct ProverKnowledge
-    verifier_knowledge :: VerifierKnowledge
-    S :: Array{Rq, 2}
+struct ProverKnowledge{Zq, Zp, G}
+    verifier_knowledge :: VerifierKnowledge{Zq, Zp, G}
+    S :: Array{<:Polynomial{Zq}, 2}
 end
 
 
-to_zp(x::Zq) = convert(Zp, value(x)) - (x > q ÷ 2 ? q : 0)
-to_zp(x::Polynomial{Zq}) = Polynomial(to_zp.(x.coeffs), x.modulus)
+# Converts a number modulo q in range (-q/2, q/2+1), stored as a positive integer in [0, q),
+# to the same signed integer, but modulo p. That is, maps [0, q/2+1) to [0, q/2+1)
+# and (-q/2 mod q, 0) to (-q/2 mod p, 0) (again, stored as a positive integer).
+function expand(::Type{Zp}, x::Zq) where {Zp <: AbstractModUInt, Zq <: AbstractModUInt}
+    x_val = value(x)
+    res = convert(Zp, x_val)
+    if x_val > (modulus(Zq) >> 1)
+        res -= convert(Zp, modulus(Zq))
+    end
+    res
+end
+expand(::Type{Zp}, x::Polynomial{Zq}) where {Zp <: AbstractModUInt, Zq <: AbstractModUInt} =
+    broadcast_into_polynomial(elem -> expand(Zp, elem), x)
 
-central(x::Zq) = big(x) > big(q) ÷ 2 ? (big(x) - big(q)) : big(x)
-function central(x::Zp)
+
+# TODO: serves only debugging purpose, move to tests
+function central(x::AbstractModUInt{T, M}) where {T, M}
     x_bi = convert(BigInt, value(x))
-    p_bi = convert(BigInt, p)
+    p_bi = convert(BigInt, M)
     x_bi > p_bi ÷ 2 ? (x_bi - p_bi) : x_bi
+end
+
+
+# Returns the negacyclic modulus (x^N+1) as a polynomial of length 2N
+function extended_poynomial_modulus(::Type{Polynomial{T, N}}) where {T, N}
+    f_coeffs = [one(T), zeros(T, N-1)..., one(T), zeros(T, N-1)...]
+    Polynomial(f_coeffs, negacyclic_modulus)
 end
 
 
 # Find R1 and R2 such that A * S + q * R1 + f * R2 = T without taking any modulus
 # (A, S, T with polynomials modulo f, and coefficients modulo q)
-function find_residuals(A::Array{P, 2}, S::Array{P, 2}, T::Array{P, 2}) where P <: Rq
+function find_residuals(
+        ::Type{Zp}, A::Array{P, 2}, S::Array{P, 2}, T::Array{P, 2}
+        ) where {Zp <: AbstractModUInt, P <: Polynomial{Zq, N}} where {N, Zq <: AbstractModUInt}
 
-    A_exp = resize.(A, 2d)
-    S_exp = resize.(S, 2d)
-    T_exp = resize.(T, 2d)
+    A_exp = resize.(A, 2N)
+    S_exp = resize.(S, 2N)
+    T_exp = resize.(T, 2N)
 
     X1 = T_exp - A_exp * S_exp
 
-    f_q = Polynomial(
-        convert.(Zq, vcat([1], zeros(Int, d-1), [1], zeros(Int, d-1))), negacyclic_modulus)
+    f_q = extended_poynomial_modulus(Polynomial{Zq, N})
+    f_p = extended_poynomial_modulus(Polynomial{Zp, N})
 
-    R2 = Array{eltype(A_exp)}(undef, size(X1)...)
-    Q = Array{eltype(A_exp)}(undef, size(X1)...)
+    R2 = Array{Polynomial{Zq, 2N}}(undef, size(X1)...)
+    Q = Array{Polynomial{Zq, 2N}}(undef, size(X1)...)
     for i in 1:size(X1, 1), j in 1:size(X1, 2)
         R2[i, j], Q[i, j] = divrem(X1[i, j], f_q)
+
+        # TODO: move to tests
         @assert all(Q[i, j].coeffs .== 0)
-        @assert all(R2[i, j].coeffs[d:end] .== 0)
+        @assert all(R2[i, j].coeffs[N:end] .== 0)
     end
 
     n, m = size(A)
     B = 10
-    bound = (m * d * B + d) ÷ 2
+    bound = (m * N * B + N) ÷ 2
 
-    A_Zp = to_zp.(A_exp)
-    S_Zp = to_zp.(S_exp)
-    T_Zp = to_zp.(T_exp)
-    R2_Zp = to_zp.(R2)
+    expand_to_Zp = x -> expand(Zp, x)
 
-    X2 = T_Zp .- A_Zp * S_Zp .- f_exp * R2_Zp
+    A_Zp = expand_to_Zp.(A_exp)
+    S_Zp = expand_to_Zp.(S_exp)
+    T_Zp = expand_to_Zp.(T_exp)
+    R2_Zp = expand_to_Zp.(R2)
 
-    q_p = convert(Zp, q)
+    X2 = T_Zp .- A_Zp * S_Zp .- f_p * R2_Zp
+
+    q_p = convert(Zp, modulus(Zq))
     R1 = X2 .* inv(q_p)
 
     for i in 1:size(R1, 1), j in 1:size(R1, 2)
+        # TODO: move to tests
         @assert all(central.(R1[i,j].coeffs) .<= bound)
     end
 
-    @assert all(T_Zp .== A_Zp * S_Zp .+ f_exp .* R2_Zp .+ q_p * R1)
+    @assert all(T_Zp .== A_Zp * S_Zp .+ f_p .* R2_Zp .+ q_p * R1)
 
-    resize.(R1, 2*d-1), resize.(R2, d-1)
+    resize.(R1, 2*N-1), resize.(R2, N-1)
 end
 
 
@@ -106,18 +139,6 @@ serialize(p::Polynomial) = p.coeffs
 function mul_by_bool_vec(a::Array{T, 1}, v::BitArray{1}) where T
     @assert length(a) == length(v)
     [v[i] ? a[i] : zero(T) for i in 1:length(a)]
-end
-
-
-function exp_to_bool_vec(a::Array{T, 1}, v::BitArray{1}) where T
-    @assert length(a) == length(v)
-    res = zero(T)
-    for i in 1:length(a)
-        if v[i]
-            res += a[i]
-        end
-    end
-    res
 end
 
 
@@ -138,13 +159,21 @@ function outer(v1::Array{T, 1}, v2::Array{T, 1}, v3::Array{T, 1}, v4::Array{T, 1
 end
 
 
-function commit(vk::VerifierKnowledge, alpha, beta_vec, gamma_vec, phi_vec, psi, w)
+function commit(
+        vk::VerifierKnowledge{Zq, Zp, G}, alpha::Zp, beta_vec::Array{Zp, 1},
+        gamma_vec::Array{Zp, 1}, phi_vec::Array{Zp, 1}, psi::Zp, w::G) where {Zq, Zp, G}
     inverses = inv.(phi_vec)
     g_vec_prime = vk.g_vec .* inverses
 
+    expand_to_Zp = x -> expand(Zp, x)
+
+    d = vk.polynomial_degree
+    q = convert(Zp, modulus(Zq))
+    f = extended_poynomial_modulus(Polynomial{Zp, d})
+
     v_vec = vcat(
         outer(
-            transpose(apply.(to_zp.(vk.A), alpha)) * gamma_vec,
+            transpose(apply.(expand_to_Zp.(vk.A), alpha)) * gamma_vec,
             beta_vec,
             powers(alpha, d),
             powers_of_2(Zp, vk.b)),
@@ -154,7 +183,7 @@ function commit(vk::VerifierKnowledge, alpha, beta_vec, gamma_vec, phi_vec, psi,
             powers(alpha, 2 * d - 1),
             powers_of_2(Zp, vk.b1)),
         outer(
-            apply.(f_exp, alpha) .* gamma_vec,
+            apply.(f, alpha) .* gamma_vec,
             beta_vec,
             powers(alpha, d - 1),
             powers_of_2(Zp, vk.b2)))
@@ -165,12 +194,12 @@ function commit(vk::VerifierKnowledge, alpha, beta_vec, gamma_vec, phi_vec, psi,
 end
 
 
-struct MainPayload1
+struct MainPayload1{G}
     w :: G
 end
 
 
-struct MainPayload2
+struct MainPayload2{Zp}
     alpha :: Zp
     beta_vec :: Array{Zp, 1}
     gamma_vec :: Array{Zp, 1}
@@ -179,17 +208,17 @@ struct MainPayload2
 end
 
 
-struct ProverMainIntermediateState
+struct ProverMainIntermediateState{Zp}
     s1_vec :: BitArray
     s2_vec :: BitArray
     rho :: Zp
 end
 
 
-function prover_main_stage1(rng::AbstractRNG, pk::ProverKnowledge)
+function prover_main_stage1(rng::AbstractRNG, pk::ProverKnowledge{Zq, Zp, G}) where {Zq, Zp, G}
     vk = pk.verifier_knowledge
 
-    R1, R2 = find_residuals(vk.A, pk.S, vk.T)
+    R1, R2 = find_residuals(Zp, vk.A, pk.S, vk.T)
 
     s_vec = serialize(pk.S)
     r1_vec = serialize(R1)
@@ -198,9 +227,9 @@ function prover_main_stage1(rng::AbstractRNG, pk::ProverKnowledge)
     s1_vec = vcat(binary(s_vec, vk.b), binary(r1_vec, vk.b1), binary(r2_vec, vk.b2))
     s2_vec = xor.(s1_vec, ones(eltype(s1_vec), length(s1_vec)))
 
-    rho = rand_Zp(rng)
+    rho = rand(rng, Zp)
 
-    w = exp_to_bool_vec(vk.g_vec, s2_vec) + exp_to_bool_vec(vk.h_vec, s1_vec) + vk.u * rho
+    w = sum(mul_by_bool_vec(vk.g_vec, s2_vec)) + sum(mul_by_bool_vec(vk.h_vec, s1_vec)) + vk.u * rho
 
     payload = MainPayload1(w)
     state = ProverMainIntermediateState(s1_vec, s2_vec, rho)
@@ -210,8 +239,8 @@ end
 
 
 function prover_main_stage2(
-        pk::ProverKnowledge, state::ProverMainIntermediateState,
-        payload1::MainPayload1, payload2::MainPayload2)
+        pk::ProverKnowledge{Zq, Zp, G}, state::ProverMainIntermediateState{Zp},
+        payload1::MainPayload1, payload2::MainPayload2) where {Zq, Zp, G}
 
     vk = pk.verifier_knowledge
 
@@ -228,27 +257,31 @@ function prover_main_stage2(
 end
 
 
-function verifier_main_stage1(rng::AbstractRNG, vk::VerifierKnowledge)
+function verifier_main_stage1(rng::AbstractRNG, vk::VerifierKnowledge{Zq, Zp, G}) where {Zq, Zp, G}
     n, m = size(vk.A)
     n, k = size(vk.T)
 
-    alpha = rand_Zp_nonzero(rng)
-    beta_vec = [rand_Zp_nonzero(rng) for i in 1:k]
-    gamma_vec = [rand_Zp_nonzero(rng) for i in 1:n]
-    phi_vec = [rand_Zp_nonzero(rng) for i in 1:vk.l]
-    psi = rand_Zp_nonzero(rng)
+    alpha = rand_nonzero(rng, Zp)
+    beta_vec = [rand_nonzero(rng, Zp) for i in 1:k]
+    gamma_vec = [rand_nonzero(rng, Zp) for i in 1:n]
+    phi_vec = [rand_nonzero(rng, Zp) for i in 1:vk.l]
+    psi = rand_nonzero(rng, Zp)
 
     MainPayload2(alpha, beta_vec, gamma_vec, phi_vec, psi)
 end
 
 
-function verifier_main_stage2(vk::VerifierKnowledge, payload1::MainPayload1, payload2::MainPayload2)
+function verifier_main_stage2(
+        vk::VerifierKnowledge{Zq, Zp, G}, payload1::MainPayload1{G}, payload2::MainPayload2{Zp}) where {Zq, Zp, G}
+
     v_vec, t, g_vec_prime = commit(
         vk, payload2.alpha, payload2.beta_vec, payload2.gamma_vec, payload2.phi_vec,
         payload2.psi, payload1.w)
 
+    expand_to_Zp = x -> expand(Zp, x)
+
     x = (
-        payload2.gamma_vec' * apply.(to_zp.(vk.T), payload2.alpha) * payload2.beta_vec +
+        payload2.gamma_vec' * apply.(expand_to_Zp.(vk.T), payload2.alpha) * payload2.beta_vec +
         payload2.psi * sum(v_vec) +
         (payload2.psi + payload2.psi^2) * sum(payload2.phi_vec))
 
@@ -256,7 +289,8 @@ function verifier_main_stage2(vk::VerifierKnowledge, payload1::MainPayload1, pay
 end
 
 
-function main_synchronous(rng::AbstractRNG, pk::ProverKnowledge, vk::VerifierKnowledge)
+function main_synchronous(
+        rng::AbstractRNG, pk::ProverKnowledge{Zq, Zp, G}, vk::VerifierKnowledge{Zq, Zp, G}) where {Zq, Zp, G}
     payload1, state = prover_main_stage1(rng, pk)
     payload2 = verifier_main_stage1(rng, vk)
     pk_ip = prover_main_stage2(pk, state, payload1, payload2)

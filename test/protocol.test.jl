@@ -1,13 +1,24 @@
-function make_A(rng::AbstractRNG, rows::Int, cols::Int)
-    [rand_Zq_polynomial(rng) for i in 1:rows, j in 1:cols]
+using LogProof: rand_point
+
+
+function rand_Zq_polynomial(rng::AbstractRNG, params::Params{Zq, Zp, G}, B::Int=0) where {Zq, Zp, G}
+    Polynomial([rand_around_zero(rng, Zq, B) for i in 1:params.d], negacyclic_modulus)
 end
 
 
-function make_S(rng::AbstractRNG, rows::Int, cols::Int, B::Int)
+function make_A(rng::AbstractRNG, params::Params, rows::Int, cols::Int)
+    [rand_Zq_polynomial(rng, params) for i in 1:rows, j in 1:cols]
+end
+
+
+function make_S(rng::AbstractRNG, params::Params, rows::Int, cols::Int, B::Int)
     [
-        broadcast_into_polynomial(-, rand_Zq_polynomial(rng, 2 * B), unsigned(B))
+        broadcast_into_polynomial(-, rand_Zq_polynomial(rng, params, 2 * B), unsigned(B))
         for i in 1:rows, j in 1:cols]
 end
+
+
+get_test_types(params::Params{Zq, Zp, G}) where {Zq, Zp, G} = Zp, G
 
 
 @testgroup "Protocol" begin
@@ -16,13 +27,16 @@ end
 @testcase "Inner product" for synchronous in ([false, true] => ["actors", "synchronous"])
     rng = MersenneTwister(123)
 
+    params = Params(251, 8)
+    Zp, G = get_test_types(params)
+
     l = 201
-    g = [rand_G(rng) for i in 1:l]
-    h = [rand_G(rng) for i in 1:l]
-    u = rand_G(rng)
-    v1 = [rand_Zp(rng) for i in 1:l]
-    v2 = [rand_Zp(rng) for i in 1:l]
-    rho = rand_Zp(rng)
+    g = [rand_point(rng, G) for i in 1:l]
+    h = [rand_point(rng, G) for i in 1:l]
+    u = rand_point(rng, G)
+    v1 = [rand(rng, Zp) for i in 1:l]
+    v2 = [rand(rng, Zp) for i in 1:l]
+    rho = rand(rng, Zp)
     t = sum(g .* v1) + sum(h .* v2) + u * rho
     x = v1' * v2
 
@@ -42,17 +56,20 @@ end
 @testcase "Folding" for synchronous in ([false, true] => ["actors", "synchronous"])
     rng = MersenneTwister(123)
 
+    params = Params(251, 8)
+    Zp, G = get_test_types(params)
+
     l = 8
-    g = [rand_G(rng) for i in 1:l]
-    h = [rand_G(rng) for i in 1:l]
-    a = rand_G(rng)
-    u = rand_G(rng)
-    v1 = [rand_Zp(rng) for i in 1:l]
-    v2 = [rand_Zp(rng) for i in 1:l]
-    rho = rand_Zp(rng)
+    g = [rand_point(rng, G) for i in 1:l]
+    h = [rand_point(rng, G) for i in 1:l]
+    a = rand_point(rng, G)
+    u = rand_point(rng, G)
+    v1 = [rand(rng, Zp) for i in 1:l]
+    v2 = [rand(rng, Zp) for i in 1:l]
+    rho = rand(rng, Zp)
     t = sum(g .* v1) + sum(h .* v2) + a * (v1' * v2) + u * rho
 
-    vk = LogProof.VerifierKnowledgeFolding(g, h, a, u, t)
+    vk = LogProof.VerifierKnowledgeFolding(Zp, g, h, a, u, t)
     pk = LogProof.ProverKnowledgeFolding(vk, v1, v2, rho)
 
     if synchronous
@@ -68,6 +85,9 @@ end
 
 
 @testcase "Main" for synchronous in ([false, true] => ["actors", "synchronous"])
+
+    params = Params(251, 8)
+
     n = 2
     m = 3
     k = 4
@@ -75,12 +95,12 @@ end
 
     rng = MersenneTwister(123)
 
-    A = make_A(rng, n, m)
-    S = make_S(rng, m, k, B)
+    A = make_A(rng, params, n, m)
+    S = make_S(rng, params, m, k, B)
 
     T = A * S
 
-    vk = VerifierKnowledge(rng, A, T, B)
+    vk = VerifierKnowledge(rng, params, A, T, B)
     pk = ProverKnowledge(vk, S)
 
     if synchronous

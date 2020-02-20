@@ -11,9 +11,8 @@ export run_pair
 include("curve.jl")
 
 include("utils.jl")
-export rand_Zq_polynomial
-export rand_G
-export rand_Zp
+export Params
+export rand_around_zero
 
 include("protocol_folding.jl")
 include("protocol_inner_product.jl")
