@@ -3,6 +3,11 @@ function next_power_of_2(x)
 end
 
 
+function curve_lincomb(points::Array{G, 1}, coeffs::Array{Z, 1}) where {Z <: AbstractModUInt, G <: EllipticCurvePoint}
+    sum(points .* coeffs)
+end
+
+
 struct VerifierKnowledgeFolding{Zp <: AbstractModUInt, G <: EllipticCurvePoint}
     g_vec :: Array{G, 1}
     h_vec :: Array{G, 1}
@@ -136,14 +141,14 @@ function prover_folding_stage1(rng, pk::ProverKnowledgeFolding{Zp, G}) where {Zp
     sigma_1 = rand(rng, Zp)
 
     t_minus1 = (
-        sum(g_t_vec .* v1_b_vec)
-        + sum(h_b_vec .* v2_t_vec)
+        curve_lincomb(g_t_vec, v1_b_vec)
+        + curve_lincomb(h_b_vec, v2_t_vec)
         + vk.a * (v1_b_vec' * v2_t_vec)
         + vk.u * sigma_minus1)
 
     t_1 = (
-        sum(g_b_vec .* v1_t_vec)
-        + sum(h_t_vec .* v2_b_vec)
+        curve_lincomb(g_b_vec, v1_t_vec)
+        + curve_lincomb(h_t_vec, v2_b_vec)
         + vk.a * (v1_t_vec' * v2_b_vec)
         + vk.u * sigma_1)
 

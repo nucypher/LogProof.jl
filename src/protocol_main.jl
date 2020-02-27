@@ -205,7 +205,7 @@ function commit(
             powers(alpha, d - 1),
             powers_of_2(Zp, vk.b2)))
 
-    t = w + sum(g_vec_prime .* (v_vec .+ psi * phi_vec)) + sum(vk.h_vec .* psi)
+    t = w + curve_lincomb(g_vec_prime, v_vec .+ psi * phi_vec) + sum(vk.h_vec) * psi
 
     v_vec, t, g_vec_prime
 end
