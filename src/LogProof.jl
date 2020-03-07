@@ -3,12 +3,10 @@ module LogProof
 using Random
 
 using DarkIntegers
-
+using DarkCurves
 
 include("actors.jl")
 export run_pair
-
-include("curve.jl")
 
 include("utils.jl")
 export Params

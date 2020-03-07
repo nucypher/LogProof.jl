@@ -3,8 +3,8 @@ function next_power_of_2(x)
 end
 
 
-function curve_lincomb(points::Array{G, 1}, coeffs::Array{Z, 1}) where {Z <: AbstractModUInt, G <: EllipticCurvePoint}
-    sum(points .* coeffs)
+function curve_lin_comb(points::Array{G, 1}, coeffs::Array{Z, 1}) where {Z <: AbstractModUInt, G <: EllipticCurvePoint}
+    lin_comb(points, value.(coeffs))
 end
 
 
@@ -42,6 +42,7 @@ struct ProverKnowledgeFolding{Zp, G}
 
         l = length(v1_vec)
         np2 = next_power_of_2(l)
+
         if np2 != l
             v1_vec = [v1_vec; [zero(Zp) for i in 1:(np2-l)]]
             v2_vec = [v2_vec; [zero(Zp) for i in 1:(np2-l)]]
@@ -79,8 +80,8 @@ function fold_commitment(vk::VerifierKnowledgeFolding{Zp, G}, t_minus1::G, t_1::
     g_t_vec, g_b_vec = halves(vk.g_vec)
     h_t_vec, h_b_vec = halves(vk.h_vec)
 
-    g_prime_vec = g_t_vec .+ g_b_vec .* c
-    h_prime_vec = h_t_vec .+ h_b_vec .* inv(c)
+    g_prime_vec = g_t_vec .+ batch_mul(g_b_vec, value(c))
+    h_prime_vec = h_t_vec .+ batch_mul(h_b_vec, value(inv(c)))
     t_pprime = t_minus1 * inv(c) + vk.t + t_1 * c
 
     VerifierKnowledgeFolding(Zp, g_prime_vec, h_prime_vec, vk.a, vk.u, t_pprime)
@@ -141,14 +142,14 @@ function prover_folding_stage1(rng, pk::ProverKnowledgeFolding{Zp, G}) where {Zp
     sigma_1 = rand(rng, Zp)
 
     t_minus1 = (
-        curve_lincomb(g_t_vec, v1_b_vec)
-        + curve_lincomb(h_b_vec, v2_t_vec)
+        curve_lin_comb(g_t_vec, v1_b_vec)
+        + curve_lin_comb(h_b_vec, v2_t_vec)
         + vk.a * (v1_b_vec' * v2_t_vec)
         + vk.u * sigma_minus1)
 
     t_1 = (
-        curve_lincomb(g_b_vec, v1_t_vec)
-        + curve_lincomb(h_t_vec, v2_b_vec)
+        curve_lin_comb(g_b_vec, v1_t_vec)
+        + curve_lin_comb(h_t_vec, v2_b_vec)
         + vk.a * (v1_t_vec' * v2_b_vec)
         + vk.u * sigma_1)
 
