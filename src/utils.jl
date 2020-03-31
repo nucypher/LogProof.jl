@@ -6,7 +6,7 @@ struct Params{Zq <: AbstractModUInt, Zp <: AbstractModUInt, G}
 
         curve = Curve_secp256k1
 
-        p_tp = MLUInt{4, UInt64}
+        p_tp = MLUInt{2, UInt128}
         p = convert(p_tp, curve_order(curve))
         Zp = ModUInt{p_tp, convert(p_tp, p)}
 
