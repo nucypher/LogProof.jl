@@ -112,8 +112,8 @@ function find_residuals(
         R2[i, j], Q[i, j] = divrem(X1[i, j], f_q)
 
         # TODO: move to tests
-        @assert all(Q[i, j].coeffs .== 0)
-        @assert all(R2[i, j].coeffs[N:end] .== 0)
+        #@assert all(Q[i, j].coeffs .== 0)
+        #@assert all(R2[i, j].coeffs[N:end] .== 0)
     end
 
     n, m = size(A)
@@ -134,10 +134,10 @@ function find_residuals(
 
     for i in 1:size(R1, 1), j in 1:size(R1, 2)
         # TODO: move to tests
-        @assert all(central.(R1[i,j].coeffs) .<= bound)
+        #@assert all(central.(R1[i,j].coeffs) .<= bound)
     end
 
-    @assert all(T_Zp .== A_Zp * S_Zp .+ f_p .* R2_Zp .+ q_p * R1)
+    #@assert all(T_Zp .== A_Zp * S_Zp .+ f_p .* R2_Zp .+ q_p * R1)
 
     resize.(R1, 2*N-1), resize.(R2, N-1)
 end
