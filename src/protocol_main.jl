@@ -1,6 +1,6 @@
 # Returns the negacyclic modulus (x^N+1) as a polynomial of length 2N
 # TODO: cannot get the modulus from the type system at the moment
-function extended_poynomial_modulus(::Type{Polynomial{T, N}}) where {T, N}
+function extended_polynomial_modulus(::Type{Polynomial{T, N}}) where {T, N}
     f_coeffs = [one(T), zeros(T, N-1)..., one(T), zeros(T, N-1)...]
     # The modulus here does not matter since it's the extended length and we won't get over it.
     # Therefore just using `negacyclic_modulus` instead of `polynomial_modulus`
@@ -103,8 +103,8 @@ function find_residuals(
 
     X1 = T_exp - A_exp * S_exp
 
-    f_q = extended_poynomial_modulus(Polynomial{Zq, N})
-    f_p = extended_poynomial_modulus(Polynomial{Zp, N})
+    f_q = extended_polynomial_modulus(Polynomial{Zq, N})
+    f_p = extended_polynomial_modulus(Polynomial{Zp, N})
 
     R2 = Array{Polynomial{Zq, 2N}}(undef, size(X1)...)
     Q = Array{Polynomial{Zq, 2N}}(undef, size(X1)...)
@@ -166,7 +166,7 @@ end
 
 function outer(v1::Array{T, 1}, v2::Array{T, 1}, v3::Array{T, 1}, v4::Array{T, 1}) where T
     # If necessary can be implemented for an arbitrary number of vectors
-    # using a generated functions, but that's too much complexity.
+    # using a generated function, but that's too much complexity.
     res = (
         reshape(v4, length(v4), 1, 1, 1) .*
         reshape(v3, 1, length(v3), 1, 1) .*
@@ -186,7 +186,7 @@ function commit(
 
     d = vk.polynomial_degree
     q = convert(Zp, modulus(Zq))
-    f = extended_poynomial_modulus(Polynomial{Zp, d})
+    f = extended_polynomial_modulus(Polynomial{Zp, d})
 
     v_vec = vcat(
         outer(
