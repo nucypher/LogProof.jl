@@ -1,7 +1,8 @@
 module LogProof
 
 using Random
-
+using Distributed
+using SharedArrays
 using DarkIntegers
 using DarkCurves
 
