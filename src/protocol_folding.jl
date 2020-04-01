@@ -195,11 +195,11 @@ function folding_synchronous(
         rng, pk::ProverKnowledgeFolding{Zp, G}, vk::VerifierKnowledgeFolding{Zp, G}) where {Zp, G}
 
     while !is_folded(vk)
-        payload1, state = prover_folding_stage1(rng, pk)
-        payload2 = verifier_folding_stage1(rng, Zp)
+        @timeit timer "prover-folding-stage1" payload1, state = prover_folding_stage1(rng, pk)
+        @timeit timer "verifier-folding-stage1" payload2 = verifier_folding_stage1(rng, Zp)
 
-        pk = prover_folding_stage2(pk, state, payload1, payload2)
-        vk = verifier_folding_stage2(vk, payload1, payload2)
+        @timeit timer "prover-folding-stage2" pk = prover_folding_stage2(pk, state, payload1, payload2)
+        @timeit timer "verifier-folding-stage2" vk = verifier_folding_stage2(vk, payload1, payload2)
     end
 
     finalize_folding(pk), finalize_folding(vk)

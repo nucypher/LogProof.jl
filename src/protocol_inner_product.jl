@@ -153,17 +153,17 @@ end
 
 function inner_product_synchronous(
         rng, pk::ProverKnowledgeInnerProduct{Zp, G}, vk::VerifierKnowledgeInnerProduct{Zp, G}) where {Zp, G}
-    payload1 = verifier_inner_product_stage1(rng, G)
-    pk_folding = prover_inner_product_stage1(pk, payload1)
-    vk_folding = verifier_inner_product_stage2(vk, payload1)
+    @timeit timer "verifier-inner-stage1" payload1 = verifier_inner_product_stage1(rng, G)
+    @timeit timer "prover-inner-stage1" pk_folding = prover_inner_product_stage1(pk, payload1)
+    @timeit timer "verifier-inner-stage2" vk_folding = verifier_inner_product_stage2(vk, payload1)
 
-    pkf, vkf = folding_synchronous(rng, pk_folding, vk_folding)
+    @timeit timer "folding" pkf, vkf = folding_synchronous(rng, pk_folding, vk_folding)
 
-    payload2, state = prover_inner_product_stage2(rng, pkf)
-    payload3 = verifier_inner_product_stage3(rng, Zp)
+    @timeit timer "prover-inner-stage2" payload2, state = prover_inner_product_stage2(rng, pkf)
+    @timeit timer "verifier-inner-stage3" payload3 = verifier_inner_product_stage3(rng, Zp)
 
-    payload4 = prover_inner_product_stage3(state, pkf, payload3)
-    verifier_inner_product_stage4(vkf, payload2, payload3, payload4)
+    @timeit timer "prover-inner-stage3" payload4 = prover_inner_product_stage3(state, pkf, payload3)
+    @timeit timer "verifier-inner-stage4" verifier_inner_product_stage4(vkf, payload2, payload3, payload4)
 end
 
 

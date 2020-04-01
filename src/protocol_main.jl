@@ -308,11 +308,13 @@ end
 
 function main_synchronous(
         rng::AbstractRNG, pk::ProverKnowledge{Zq, Zp, G}, vk::VerifierKnowledge{Zq, Zp, G}) where {Zq, Zp, G}
-    payload1, state = prover_main_stage1(rng, pk)
-    payload2 = verifier_main_stage1(rng, vk)
-    pk_ip = prover_main_stage2(pk, state, payload1, payload2)
-    vk_ip = verifier_main_stage2(vk, payload1, payload2)
-    inner_product_synchronous(rng, pk_ip, vk_ip)
+    @timeit timer "Full protocol" begin
+        @timeit timer "prover-main-stage1" payload1, state = prover_main_stage1(rng, pk)
+        @timeit timer "verifier-main-stage1" payload2 = verifier_main_stage1(rng, vk)
+        @timeit timer "prover-main-stage2" pk_ip = prover_main_stage2(pk, state, payload1, payload2)
+        @timeit timer "verifier-main-stage2" vk_ip = verifier_main_stage2(vk, payload1, payload2)
+        @timeit timer "inner product" inner_product_synchronous(rng, pk_ip, vk_ip)
+    end
 end
 
 

@@ -1,9 +1,19 @@
 module LogProof
 
+using TimerOutputs
 using Random
 
 using DarkIntegers
 using DarkCurves
+
+timer = TimerOutput()
+
+reset_stage_timer!() = reset_timer!(timer)
+function display_stage_timer()
+    display(timer)
+    println()
+end
+
 
 include("actors.jl")
 export run_pair
