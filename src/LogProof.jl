@@ -2,7 +2,8 @@ module LogProof
 
 using TimerOutputs
 using Random
-
+using Distributed
+using SharedArrays
 using DarkIntegers
 using DarkCurves
 

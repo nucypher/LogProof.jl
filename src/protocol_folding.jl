@@ -4,7 +4,7 @@ end
 
 
 function curve_lin_comb(points::Array{G, 1}, coeffs::Array{Z, 1}) where {Z <: AbstractModUInt, G <: EllipticCurvePoint}
-    lin_comb(points, value.(coeffs))
+    lin_comb_mp(points, value.(coeffs))
 end
 
 
@@ -80,8 +80,8 @@ function fold_commitment(vk::VerifierKnowledgeFolding{Zp, G}, t_minus1::G, t_1::
     g_t_vec, g_b_vec = halves(vk.g_vec)
     h_t_vec, h_b_vec = halves(vk.h_vec)
 
-    g_prime_vec = g_t_vec .+ batch_mul(g_b_vec, value(c))
-    h_prime_vec = h_t_vec .+ batch_mul(h_b_vec, value(inv(c)))
+    g_prime_vec = g_t_vec .+ batch_mul_mp(g_b_vec, value(c))
+    h_prime_vec = h_t_vec .+ batch_mul_mp(h_b_vec, value(inv(c)))
     t_pprime = t_minus1 * inv(c) + vk.t + t_1 * c
 
     VerifierKnowledgeFolding(Zp, g_prime_vec, h_prime_vec, vk.a, vk.u, t_pprime)

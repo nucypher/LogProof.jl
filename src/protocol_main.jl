@@ -179,8 +179,8 @@ end
 function commit(
         vk::VerifierKnowledge{Zq, Zp, G}, alpha::Zp, beta_vec::Array{Zp, 1},
         gamma_vec::Array{Zp, 1}, phi_vec::Array{Zp, 1}, psi::Zp, w::G) where {Zq, Zp, G}
-    inverses = inv.(phi_vec)
-    g_vec_prime = vk.g_vec .* inverses
+
+    g_vec_prime = mul_by_inv_mp(vk.g_vec, phi_vec)
 
     expand_to_Zp = x -> expand(Zp, x)
 

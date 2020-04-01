@@ -159,3 +159,52 @@ function powers_of_2(::Type{T}, d) where T
     res[end] = -res[end]
     res
 end
+
+
+function splay(arr::AbstractArray{T, 1}, nw) where T
+    chunk_size, remainder = divrem(length(arr), nw)
+    result = Array{Array{T, 1}}(undef, nw)
+    for i in 1:nw
+        start = (i - 1) * chunk_size + 1 + min(i - 1, remainder)
+        stop = start + chunk_size - 1 + (i <= remainder ? 1 : 0)
+        result[i] = arr[start:stop]
+    end
+    result
+end
+
+
+function lin_comb_mp(
+        points::Array{P, 1}, coeffs::Array{T, 1}, w::Int=4) where {P <: EllipticCurvePoint, T <: Integer}
+    nw = nworkers()
+    if nw == 1 || nw > length(points)
+        return lin_comb(points, coeffs, w)
+    end
+    point_chunks = splay(points, nw)
+    coeff_chunks = splay(coeffs, nw)
+    sum(pmap(lin_comb, point_chunks, coeff_chunks, repeat([w], nw)))
+end
+
+
+function batch_mul_mp(
+        points::Array{P, 1}, coeff::T, w1::Int=4, w2::Int=4,
+        ) where {P <: EllipticCurvePoint{C, V}, T <: Integer} where {C, V}
+    nw = nworkers()
+    if nw == 1 || nw > length(points)
+        return batch_mul(points, coeff, w1, w2)
+    end
+    point_chunks = splay(points, nw)
+    vcat(pmap(batch_mul, point_chunks, repeat([coeff], nw), repeat([w1], nw), repeat([w2], nw))...)
+end
+
+
+function mul_by_inv_mp(g_vec::Array{G, 1}, phi_vec::Array{Zp, 1}) where {Zp, G}
+    if nworkers() == 1
+        return g_vec .* inv.(phi_vec)
+    end
+
+    g_vec_prime = SharedArray{G}(length(g_vec))
+    @sync @distributed for i in 1:length(g_vec)
+        g_vec_prime[i] = g_vec[i] * inv(phi_vec[i])
+    end
+    sdata(g_vec_prime)
+end
