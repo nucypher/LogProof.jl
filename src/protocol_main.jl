@@ -8,8 +8,36 @@ function extended_polynomial_modulus(::Type{Polynomial{T, N}}) where {T, N}
 end
 
 
+struct ProofParams{Zq <: AbstractModUInt, Zp <: AbstractModUInt, G}
+
+    function ProofParams(q::Int, point_coords::Type=JacobianPoint)
+        q_tp = UInt64
+        Zq = ModUInt{q_tp, convert(q_tp, q)}
+
+        curve = Curve_secp256k1
+
+        p_tp = MLUInt{2, UInt128}
+        p = convert(p_tp, curve_order(curve))
+        Zp = ModUInt{p_tp, convert(p_tp, p)}
+
+        # p is prime, so NTT multiplication will be used automatically,
+        # and finding a generator for a 256-bit prime takes a long time.
+        # Use Karatsuba for simplicity.
+        @eval DarkIntegers.known_polynomial_mul_function(
+            ::Type{$Zp}, ::Val{N}, ::DarkIntegers.NegacyclicModulus) where N = DarkIntegers.karatsuba_mul
+
+        curve_tp = curve_scalar_type(curve, MgModUInt, p_tp)
+        G = point_coords{curve, curve_tp}
+
+        f_norm = 1 # we're using negacyclic polynomials, so it is the norm of `x^N + 1`
+
+        new{Zq, Zp, G}()
+    end
+end
+
+
 struct VerifierKnowledge{Zq, Zp, G}
-    params :: Params{Zq, Zp, G}
+    params :: ProofParams{Zq, Zp, G}
     A :: Array{<:Polynomial{Zq}, 2}
     T :: Array{<:Polynomial{Zq}, 2}
     polynomial_degree :: Int
@@ -22,7 +50,7 @@ struct VerifierKnowledge{Zq, Zp, G}
     u :: G
 
     function VerifierKnowledge(
-            rng, params::Params{Zq, Zp, G}, A::Array{P, 2}, T::Array{P, 2}, B::Int
+            rng, params::ProofParams{Zq, Zp, G}, A::Array{P, 2}, T::Array{P, 2}, B::Int
             ) where {Zq, Zp, G, P <: Polynomial{Zq, N}} where N
 
         # TODO: cannot enforce it with type system at the moment
