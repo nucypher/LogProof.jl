@@ -96,6 +96,11 @@ function encrypt(rng, pk::PublicKey{R}, m::R) where {R <: Polynomial{Z, N}} wher
     T = collect(transpose([u v;]))
 
     vk = VerifierKnowledge(rng, params.proof_params, A, T, params.noise_bound)
+
+    # `A` can be transmitted just as `pk.a`, `pk.t` and `p`
+    sz = size_estimate_without_A(vk) + size_estimate(pk.a) + size_estimate(pk.t) + size_estimate(Z)
+    println("(verifier knowledge) prover -> verifier ", sz)
+
     pk = ProverKnowledge(vk, S)
 
     pk, Ciphertext{R}(u, v)

@@ -5,54 +5,41 @@ using DarkIntegers
 using DarkCurves
 
 
-function rand_Zq_polynomial(
-        rng::AbstractRNG, params::Params{Zq, Zp, G}, d::Int, B::Int=0) where {Zq, Zp, G}
-    Polynomial([rand_around_zero(rng, Zq, B) for i in 1:d], negacyclic_modulus)
+function test_run(warmup=false)
+
+    rng = MersenneTwister(123)
+
+    params = EncryptionParams(8191, 4, 2, 1024)
+
+    skey = SecretKey(rng, params)
+    pkey = PublicKey(rng, skey)
+
+    m = rand_message(rng, params)
+
+    pk, ct = encrypt(rng, pkey, m)
+
+    if !warmup
+        LogProof.reset_stage_timer!()
+    end
+    main_synchronous(rng, pk, pk.verifier_knowledge)
+    if !warmup
+        LogProof.display_stage_timer()
+    end
+
+    m_back = decrypt(skey, ct)
+
+    @assert m == m_back
 end
-
-
-function make_A(rng::AbstractRNG, params::Params, d::Int, rows::Int, cols::Int)
-    [rand_Zq_polynomial(rng, params, d) for i in 1:rows, j in 1:cols]
-end
-
-
-function make_S(rng::AbstractRNG, params::Params, d::Int, rows::Int, cols::Int, B::Int)
-    [
-        broadcast_into_polynomial(-, rand_Zq_polynomial(rng, params, d, 2 * B), unsigned(B))
-        for i in 1:rows, j in 1:cols]
-end
-
-
-get_test_types(params::Params{Zq, Zp, G}) where {Zq, Zp, G} = Zp, G
 
 
 function main()
 
-    params = Params(8191)
-    Zp, G = get_test_types(params)
-
-    n = 2
-    m = 4
-    k = 1
-    B = 4
-
-    rng = MersenneTwister(123)
-
-    A = make_A(rng, params, 1024, n, m)
-    S = make_S(rng, params, 1024, m, k, B)
-
-    T = A * S
-
-    vk = VerifierKnowledge(rng, params, A, T, B)
-    pk = ProverKnowledge(vk, S)
-
     println("warm-up starting")
-    @time main_synchronous(rng, pk, vk)
+    test_run(true)
     println("warm-up done")
+    println()
 
-    LogProof.reset_stage_timer!()
-    main_synchronous(rng, pk, vk)
-    LogProof.display_stage_timer()
+    test_run()
 end
 
 

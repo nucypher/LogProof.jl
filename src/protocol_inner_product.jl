@@ -20,10 +20,16 @@ struct InnerProductPayload1{G}
 end
 
 
+size_estimate(p::InnerProductPayload1{G}) where G = size_estimate(G)
+
+
 struct InnerProductPayload2{G}
     w :: G
     w_prime :: G
 end
+
+
+size_estimate(p::InnerProductPayload2{G}) where G = 2 * size_estimate(G)
 
 
 struct InnerProductPayload3{Zp}
@@ -31,11 +37,17 @@ struct InnerProductPayload3{Zp}
 end
 
 
+size_estimate(p::InnerProductPayload3{Zp}) where Zp = size_estimate(Zp)
+
+
 struct InnerProductPayload4{Zp}
     z1 :: Zp
     z2 :: Zp
     tau :: Zp
 end
+
+
+size_estimate(p::InnerProductPayload4{Zp}) where Zp = 3 * size_estimate(Zp)
 
 
 struct ProverInnerProductIntermediateState{Zp}
@@ -154,15 +166,18 @@ end
 function inner_product_synchronous(
         rng, pk::ProverKnowledgeInnerProduct{Zp, G}, vk::VerifierKnowledgeInnerProduct{Zp, G}) where {Zp, G}
     @timeit timer "verifier-inner-stage1" payload1 = verifier_inner_product_stage1(rng, G)
+    println("(inner_product) verifier -> prover ", size_estimate(payload1))
     @timeit timer "prover-inner-stage1" pk_folding = prover_inner_product_stage1(pk, payload1)
     @timeit timer "verifier-inner-stage2" vk_folding = verifier_inner_product_stage2(vk, payload1)
 
     @timeit timer "folding" pkf, vkf = folding_synchronous(rng, pk_folding, vk_folding)
 
     @timeit timer "prover-inner-stage2" payload2, state = prover_inner_product_stage2(rng, pkf)
+    println("(inner_product) prover -> verifier ", size_estimate(payload2))
     @timeit timer "verifier-inner-stage3" payload3 = verifier_inner_product_stage3(rng, Zp)
-
+    println("(inner_product) verifier -> prover ", size_estimate(payload3))
     @timeit timer "prover-inner-stage3" payload4 = prover_inner_product_stage3(state, pkf, payload3)
+    println("(inner_product) prover -> verifier ", size_estimate(payload4))
     @timeit timer "verifier-inner-stage4" verifier_inner_product_stage4(vkf, payload2, payload3, payload4)
 end
 

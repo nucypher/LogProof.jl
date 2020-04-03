@@ -94,9 +94,15 @@ struct FoldingPayloadStage1{G}
 end
 
 
+size_estimate(p::FoldingPayloadStage1{G}) where G = 2 * size_estimate(G)
+
+
 struct FoldingPayloadStage2{Zp}
     c :: Zp
 end
+
+
+size_estimate(p::FoldingPayloadStage2{Zp}) where Zp = size_estimate(Zp)
 
 
 function is_folded(pk::ProverKnowledgeFolding)
@@ -196,7 +202,9 @@ function folding_synchronous(
 
     while !is_folded(vk)
         @timeit timer "prover-folding-stage1" payload1, state = prover_folding_stage1(rng, pk)
+        println("(folding) prover -> verifier ", size_estimate(payload1))
         @timeit timer "verifier-folding-stage1" payload2 = verifier_folding_stage1(rng, Zp)
+        println("(folding) verifier -> prover ", size_estimate(payload2))
 
         @timeit timer "prover-folding-stage2" pk = prover_folding_stage2(pk, state, payload1, payload2)
         @timeit timer "verifier-folding-stage2" vk = verifier_folding_stage2(vk, payload1, payload2)

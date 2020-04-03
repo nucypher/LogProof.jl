@@ -36,6 +36,12 @@ struct ProofParams{Zq <: AbstractModUInt, Zp <: AbstractModUInt, G}
 end
 
 
+size_estimate(::Z) where Z <: AbstractModUInt = size_estimate(Z)
+size_estimate(::G) where G <: EllipticCurvePoint = size_estimate(G)
+size_estimate(::Type{Z}) where Z <: AbstractModUInt{T, M} where {T, M} = num_bits(M) / 8
+size_estimate(::Type{G}) where G <: EllipticCurvePoint{C, T} where {C, T} = size_estimate(T)
+
+
 struct VerifierKnowledge{Zq, Zp, G}
     params :: ProofParams{Zq, Zp, G}
     A :: Array{<:Polynomial{Zq}, 2}
@@ -78,6 +84,21 @@ struct VerifierKnowledge{Zq, Zp, G}
         new{Zq, Zp, G}(params, A, T, N, b, b1, b2, l, g_vec, h_vec, u)
     end
 end
+
+
+size_estimate(p::Polynomial{T, N}) where {T, N} = size_estimate(Polynomial{T, N})
+size_estimate(p::Type{P}) where P <: Polynomial{T, N} where {T, N} =
+    # 4 bytes for the length
+    size_estimate(T) * N + 4
+size_estimate(a::Array{T, N}) where {T, N} =
+    # 4 bytes for each dimension + 4 bytes for the number of dimensions
+    size_estimate(T) * length(a) + 4 * ndims(a) + 4
+
+
+size_estimate_without_A(vk::VerifierKnowledge{Zq, Zp, G}) where {Zq, Zp, G} =
+    # 4 bytes for B, the rest we can generate on the verifier's machine
+    size_estimate(vk.T) + 4 + size_estimate(vk.g_vec) + size_estimate(vk.h_vec) + size_estimate(vk.u)
+
 
 
 struct ProverKnowledge{Zq, Zp, G}
@@ -244,6 +265,9 @@ struct MainPayload1{G}
 end
 
 
+size_estimate(p::MainPayload1{G}) where G = size_estimate(G)
+
+
 struct MainPayload2{Zp}
     alpha :: Zp
     beta_vec :: Array{Zp, 1}
@@ -251,6 +275,11 @@ struct MainPayload2{Zp}
     phi_vec :: Array{Zp, 1}
     psi :: Zp
 end
+
+
+size_estimate(p::MainPayload2{Zp}) where Zp =
+    # 4 bytes to encode the length of vectors
+    size_estimate(Zp) * (1 + length(p.beta_vec) + length(p.gamma_vec) + length(p.phi_vec) + 1) + 4
 
 
 struct ProverMainIntermediateState{Zp}
@@ -338,7 +367,9 @@ function main_synchronous(
         rng::AbstractRNG, pk::ProverKnowledge{Zq, Zp, G}, vk::VerifierKnowledge{Zq, Zp, G}) where {Zq, Zp, G}
     @timeit timer "Full protocol" begin
         @timeit timer "prover-main-stage1" payload1, state = prover_main_stage1(rng, pk)
+        println("(main) prover -> verifier ", size_estimate(payload1))
         @timeit timer "verifier-main-stage1" payload2 = verifier_main_stage1(rng, vk)
+        println("(main) verifier -> prover ", size_estimate(payload2))
         @timeit timer "prover-main-stage2" pk_ip = prover_main_stage2(pk, state, payload1, payload2)
         @timeit timer "verifier-main-stage2" vk_ip = verifier_main_stage2(vk, payload1, payload2)
         @timeit timer "inner product" inner_product_synchronous(rng, pk_ip, vk_ip)
