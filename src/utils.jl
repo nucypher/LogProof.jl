@@ -1,41 +1,13 @@
-struct Params{Zq <: AbstractModUInt, Zp <: AbstractModUInt, G}
-
-    function Params(q::Int, point_coords::Type=JacobianPoint)
-        q_tp = UInt64
-        Zq = ModUInt{q_tp, convert(q_tp, q)}
-
-        curve = Curve_secp256k1
-
-        p_tp = MLUInt{2, UInt128}
-        p = convert(p_tp, curve_order(curve))
-        Zp = ModUInt{p_tp, convert(p_tp, p)}
-
-        # p is prime, so NTT multiplication will be used automatically,
-        # and finding a generator for a 256-bit prime takes a long time.
-        # Use Karatsuba for simplicity.
-        @eval DarkIntegers.known_polynomial_mul_function(
-            ::Type{$Zp}, ::Val{N}, ::DarkIntegers.NegacyclicModulus) where N = DarkIntegers.karatsuba_mul
-
-        curve_tp = curve_scalar_type(curve, MgModUInt, p_tp)
-        G = point_coords{curve, curve_tp}
-
-        f_norm = 1 # we're using negacyclic polynomials, so it is the norm of `x^N + 1`
-
-        new{Zq, Zp, G}()
-    end
-end
-
-
 # in the centered representation the range of Z* is [-half_mod, half_mod]
 half_mod(::Type{T}) where T <: AbstractModUInt = convert(T, modulus(T) >> 1)
 
 
 function rand_around_zero(rng::AbstractRNG, ::Type{Z}, B::Int=0) where Z <: AbstractModUInt{T, M} where {T, M}
     if B == 0
-        res = rand(rng, zero(T):(M - one(T)))
+        res = rand(rng, zero(BigInt):big(M - one(T)))
     else
         # TODO: or is it supposed to be the range (-B, B)?
-        res = rand(rng, zero(T):(convert(T, B) - one(T)))
+        res = rand(rng, 0:B-1)
     end
     convert(Z, res)
 end
