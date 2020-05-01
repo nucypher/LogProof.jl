@@ -6,6 +6,11 @@ using Distributed
 using SharedArrays
 using DarkIntegers
 using DarkCurves
+using Curve25519
+using Curve25519: RistrettoPointCT, RistrettoScalarCT, FieldElement51
+using ConstantTime
+
+const CT = ConstantTime
 
 timer = TimerOutput()
 

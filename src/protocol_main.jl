@@ -8,17 +8,15 @@ function extended_polynomial_modulus(::Type{Polynomial{T, N}}) where {T, N}
 end
 
 
-struct ProofParams{Zq <: AbstractModUInt, Zp <: AbstractModUInt, G}
+struct ProofParams{Zq <: AbstractModUInt, Zp, G}
 
     function ProofParams(q::Int, point_coords::Type=JacobianPoint)
         q_tp = UInt64
         Zq = ModUInt{q_tp, convert(q_tp, q)}
 
-        curve = Curve_secp256k1
-
         p_tp = MLUInt{2, UInt128}
-        p = convert(p_tp, curve_order(curve))
-        Zp = ModUInt{p_tp, convert(p_tp, p)}
+        p = convert(p_tp, Curve25519.BASEPOINT_ORDER)
+        Zp = ModUInt{p_tp, p}
 
         # p is prime, so NTT multiplication will be used automatically,
         # and finding a generator for a 256-bit prime takes a long time.
@@ -26,8 +24,7 @@ struct ProofParams{Zq <: AbstractModUInt, Zp <: AbstractModUInt, G}
         @eval DarkIntegers.known_polynomial_mul_function(
             ::Type{$Zp}, ::Val{N}, ::DarkIntegers.NegacyclicModulus) where N = DarkIntegers.karatsuba_mul
 
-        curve_tp = curve_scalar_type(curve, MgModUInt, p_tp)
-        G = point_coords{curve, curve_tp}
+        G = RistrettoPointCT
 
         f_norm = 1 # we're using negacyclic polynomials, so it is the norm of `x^N + 1`
 
@@ -38,8 +35,10 @@ end
 
 size_estimate(::Z) where Z <: AbstractModUInt = size_estimate(Z)
 size_estimate(::G) where G <: EllipticCurvePoint = size_estimate(G)
+size_estimate(::RistrettoPointCT) = size_estimate(RistrettoPointCT)
 size_estimate(::Type{Z}) where Z <: AbstractModUInt{T, M} where {T, M} = num_bits(M) / 8
 size_estimate(::Type{G}) where G <: EllipticCurvePoint{C, T} where {C, T} = size_estimate(T)
+size_estimate(::Type{RistrettoPointCT}) = sizeof(RistrettoPointCT)
 
 
 struct VerifierKnowledge{Zq, Zp, G}

@@ -41,6 +41,12 @@ function Base.rand(rng::AbstractRNG, ::Type{Z}) where Z <: AbstractModUInt{T, M}
 end
 
 
+function Base.rand(rng::AbstractRNG, ::Type{RistrettoScalarCT})
+    val = rand(rng, zero(BigInt):Curve25519.BASEPOINT_ORDER-one(BigInt))
+    CT.wrap(convert(Curve25519.RistrettoScalarVT, val))
+end
+
+
 function rand_nonzero(rng::AbstractRNG, ::Type{Z}) where Z <: AbstractModUInt{T, M} where {T, M}
     _rand_moduint(rng, Z, one(T), M - one(T))
 end
@@ -49,6 +55,13 @@ end
 function rand_point(rng::AbstractRNG, ::Type{G}) where G <: EllipticCurvePoint{C, Z} where {C, Z <: AbstractModUInt}
     res = rand(rng, Z)
     one(G) * res + one(G)
+end
+
+
+function rand_point(rng::AbstractRNG, ::Type{RistrettoPointCT})
+    res = rand(rng, RistrettoScalarCT)
+    one_ = Curve25519.base_point(RistrettoPointCT)
+    one_ * CT.unwrap(res) + one_
 end
 
 
@@ -146,7 +159,7 @@ end
 
 
 function lin_comb_mp(
-        points::Array{P, 1}, coeffs::Array{T, 1}, w::Int=4) where {P <: EllipticCurvePoint, T <: Integer}
+        points::Array{P, 1}, coeffs::Array{T, 1}, w::Int=4) where {P, T <: Integer}
     nw = nworkers()
     if nw == 1 || nw > length(points)
         return lin_comb(points, coeffs, w)
@@ -159,7 +172,7 @@ end
 
 function batch_mul_mp(
         points::Array{P, 1}, coeff::T, w1::Int=4, w2::Int=4,
-        ) where {P <: EllipticCurvePoint{C, V}, T <: Integer} where {C, V}
+        ) where {P, T <: Integer}
     nw = nworkers()
     if nw == 1 || nw > length(points)
         return batch_mul(points, coeff, w1, w2)
