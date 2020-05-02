@@ -16,11 +16,10 @@ function test_run(warmup=false)
 
     m = rand_message(rng, params)
 
-    pk, ct = encrypt(rng, pkey, m)
-
     if !warmup
         LogProof.reset_stage_timer!()
     end
+    pk, ct = encrypt(rng, pkey, m)
     main_synchronous(rng, pk, pk.verifier_knowledge)
     if !warmup
         LogProof.display_stage_timer()

@@ -76,26 +76,32 @@ end
 
 
 function encrypt(rng, pk::PublicKey{R}, m::R) where {R <: Polynomial{Z, N}} where {Z, N}
-    params = pk.params
-    r = noise_polynomial(rng, Z, N, params.noise_bound)
-    e1 = noise_polynomial(rng, Z, N, params.noise_bound)
-    e2 = noise_polynomial(rng, Z, N, params.noise_bound)
+    @timeit timer "encryption" begin
+        params = pk.params
+        r = noise_polynomial(rng, Z, N, params.noise_bound)
+        e1 = noise_polynomial(rng, Z, N, params.noise_bound)
+        e2 = noise_polynomial(rng, Z, N, params.noise_bound)
 
-    @assert all(m.coeffs .< params.message_bound)
+        #@assert all(m.coeffs .< params.message_bound)
 
-    p_big = convert(Z, params.message_bound)
+        p_big = convert(Z, params.message_bound)
 
-    u = p_big * (pk.a * r + e1)
-    v = p_big * (pk.t * r + e2) + m
+        u = p_big * (pk.a * r + e1)
+        v = p_big * (pk.t * r + e2) + m
+    end
 
-    poly_zero = scalar_polynomial(R, 0)
-    poly_one = scalar_polynomial(R, 1)
-    poly_p = scalar_polynomial(R, p_big)
-    A = [p_big*pk.a poly_p poly_zero poly_zero; p_big*pk.t poly_zero poly_p poly_one]
-    S = collect(transpose([r e1 e2 m;]))
-    T = collect(transpose([u v;]))
+    @timeit timer "proof creation stage1" begin
+        poly_zero = scalar_polynomial(R, 0)
+        poly_one = scalar_polynomial(R, 1)
+        poly_p = scalar_polynomial(R, p_big)
+        A = [p_big*pk.a poly_p poly_zero poly_zero; p_big*pk.t poly_zero poly_p poly_one]
+        S = collect(transpose([r e1 e2 m;]))
+        T = collect(transpose([u v;]))
+    end
 
-    vk = VerifierKnowledge(rng, params.proof_params, A, T, params.noise_bound)
+    @timeit timer "proof creation stage2" begin
+        vk = VerifierKnowledge(rng, params.proof_params, A, T, params.noise_bound)
+    end
 
     # `A` can be transmitted just as `pk.a`, `pk.t` and `p`
     sz = size_estimate_without_A(vk) + size_estimate(pk.a) + size_estimate(pk.t) + size_estimate(Z)
