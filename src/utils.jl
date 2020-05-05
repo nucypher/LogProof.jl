@@ -19,6 +19,12 @@ function rand_nonzero(rng::AbstractRNG, ::Type{Z}, dims...) where Z <: AbstractM
 end
 
 
+function _rand_point(seed::UInt64, ::Type{G}, dim) where G
+    rng = MersenneTwister(seed)
+    rand(rng, G, dim)
+end
+
+
 rand_point(rng::AbstractRNG, ::Type{G}) where G = rand(rng, G)
 
 
