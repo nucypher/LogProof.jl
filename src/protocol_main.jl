@@ -77,8 +77,8 @@ struct VerifierKnowledge{Zq, Zp, G}
         b2 = ceil(Int, log2(q))
         l = m * k * N * b + n * k * (2 * N - 1) * b1 + n * k * (N - 1) * b2
 
-        g_vec = [rand_point(rng, G) for i in 1:l]
-        h_vec = [rand_point(rng, G) for i in 1:l]
+        g_vec = rand_point(rng, G, l)
+        h_vec = rand_point(rng, G, l)
         u = rand_point(rng, G)
 
         new{Zq, Zp, G}(params, A, T, N, b, b1, b2, l, g_vec, h_vec, u)
@@ -336,9 +336,9 @@ function verifier_main_stage1(rng::AbstractRNG, vk::VerifierKnowledge{Zq, Zp, G}
     n, k = size(vk.T)
 
     alpha = rand_nonzero(rng, Zp)
-    beta_vec = [rand_nonzero(rng, Zp) for i in 1:k]
-    gamma_vec = [rand_nonzero(rng, Zp) for i in 1:n]
-    phi_vec = [rand_nonzero(rng, Zp) for i in 1:vk.l]
+    beta_vec = rand_nonzero(rng, Zp, k)
+    gamma_vec = rand_nonzero(rng, Zp, n)
+    phi_vec = rand_nonzero(rng, Zp, vk.l)
     psi = rand_nonzero(rng, Zp)
 
     MainPayload2(alpha, beta_vec, gamma_vec, phi_vec, psi)

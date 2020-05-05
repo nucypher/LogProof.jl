@@ -3,7 +3,7 @@ using LogProof: rand_point
 
 function rand_Zq_polynomial(
         rng::AbstractRNG, params::ProofParams{Zq, Zp, G}, d::Int, B::Int=0) where {Zq, Zp, G}
-    Polynomial([rand_around_zero(rng, Zq, B) for i in 1:d], negacyclic_modulus)
+    Polynomial(rand_around_zero(rng, Zq, B, d), negacyclic_modulus)
 end
 
 
@@ -32,11 +32,11 @@ get_test_types(params::ProofParams{Zq, Zp, G}) where {Zq, Zp, G} = Zp, G
     Zp, G = get_test_types(params)
 
     l = 201
-    g = [rand_point(rng, G) for i in 1:l]
-    h = [rand_point(rng, G) for i in 1:l]
+    g = rand_point(rng, G, l)
+    h = rand_point(rng, G, l)
     u = rand_point(rng, G)
-    v1 = [rand(rng, Zp) for i in 1:l]
-    v2 = [rand(rng, Zp) for i in 1:l]
+    v1 = rand(rng, Zp, l)
+    v2 = rand(rng, Zp, l)
     rho = rand(rng, Zp)
     t = sum(g .* v1) + sum(h .* v2) + u * rho
     x = v1' * v2
@@ -61,12 +61,12 @@ end
     Zp, G = get_test_types(params)
 
     l = 8
-    g = [rand_point(rng, G) for i in 1:l]
-    h = [rand_point(rng, G) for i in 1:l]
+    g = rand_point(rng, G, l)
+    h = rand_point(rng, G, l)
     a = rand_point(rng, G)
     u = rand_point(rng, G)
-    v1 = [rand(rng, Zp) for i in 1:l]
-    v2 = [rand(rng, Zp) for i in 1:l]
+    v1 = rand(rng, Zp, l)
+    v2 = rand(rng, Zp, l)
     rho = rand(rng, Zp)
     t = sum(g .* v1) + sum(h .* v2) + a * (v1' * v2) + u * rho
 
