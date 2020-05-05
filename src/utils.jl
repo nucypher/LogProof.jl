@@ -19,8 +19,22 @@ function rand_nonzero(rng::AbstractRNG, ::Type{Z}, dims...) where Z <: AbstractM
 end
 
 
-function rand_point(rng::AbstractRNG, ::Type{G}, dims...) where G <: EllipticCurvePoint{C, Z} where {C, Z <: AbstractModUInt}
-    rand(rng, G, dims...)
+rand_point(rng::AbstractRNG, ::Type{G}) where G = rand(rng, G)
+
+
+function rand_point(rng::AbstractRNG, ::Type{G}, dim) where G <: EllipticCurvePoint{C, Z} where {C, Z <: AbstractModUInt}
+    nw = nworkers()
+    if nw == 1 || nw > dim
+        return rand(rng, G, dim)
+    end
+
+    dims = splay_len(dim, nw)
+
+    # Technically not secure, but neither is MersenneTwister.
+    # Makes the results reproducible.
+    seeds = rand(rng, UInt64, nw)
+
+    vcat(pmap(_rand_point, seeds, repeat([G], nw), dims)...)
 end
 
 
@@ -114,6 +128,12 @@ function splay(arr::AbstractArray{T, 1}, nw) where T
         result[i] = arr[start:stop]
     end
     result
+end
+
+
+function splay_len(len::Int, nw)
+    chunk_size, remainder = divrem(len, nw)
+    [chunk_size + (i <= remainder ? 1 : 0) for i in 1:nw]
 end
 
 
