@@ -28,7 +28,7 @@ end
 rand_point(rng::AbstractRNG, ::Type{G}) where G = rand(rng, G)
 
 
-function rand_point(rng::AbstractRNG, ::Type{G}, dim) where G <: EllipticCurvePoint{C, Z} where {C, Z <: AbstractModUInt}
+function rand_point(rng::AbstractRNG, ::Type{G}, dim) where G
     nw = nworkers()
     if nw == 1 || nw > dim
         return rand(rng, G, dim)

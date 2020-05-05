@@ -6,6 +6,9 @@ using Distributed
 using SharedArrays
 using DarkIntegers
 using DarkCurves
+using Curve25519
+using Curve25519: RistrettoPointVT, RistrettoScalarVT
+
 
 timer = TimerOutput()
 

@@ -16,9 +16,7 @@ struct ProofParams{Zq <: AbstractModUInt, Zp <: AbstractModUInt, G}
 
         curve = Curve_secp256k1
 
-        p_tp = MLUInt{2, UInt128}
-        p = convert(p_tp, curve_order(curve))
-        Zp = ModUInt{p_tp, convert(p_tp, p)}
+        Zp = RistrettoScalarVT
 
         # p is prime, so NTT multiplication will be used automatically,
         # and finding a generator for a 256-bit prime takes a long time.
@@ -26,8 +24,7 @@ struct ProofParams{Zq <: AbstractModUInt, Zp <: AbstractModUInt, G}
         @eval DarkIntegers.known_polynomial_mul_function(
             ::Type{$Zp}, ::Val{N}, ::DarkIntegers.NegacyclicModulus) where N = DarkIntegers.karatsuba_mul
 
-        curve_tp = curve_scalar_type(curve, MgModUInt, p_tp)
-        G = point_coords{curve, curve_tp}
+        G = RistrettoPointVT
 
         f_norm = 1 # we're using negacyclic polynomials, so it is the norm of `x^N + 1`
 
@@ -40,6 +37,9 @@ size_estimate(::Z) where Z <: AbstractModUInt = size_estimate(Z)
 size_estimate(::G) where G <: EllipticCurvePoint = size_estimate(G)
 size_estimate(::Type{Z}) where Z <: AbstractModUInt{T, M} where {T, M} = num_bits(M) / 8
 size_estimate(::Type{G}) where G <: EllipticCurvePoint{C, T} where {C, T} = size_estimate(T)
+
+size_estimate(::RistrettoPointVT) = size_estimate(RistrettoPointVT)
+size_estimate(::Type{RistrettoPointVT}) = sizeof(RistrettoPointVT)
 
 
 struct VerifierKnowledge{Zq, Zp, G}

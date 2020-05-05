@@ -3,7 +3,7 @@ function next_power_of_2(x)
 end
 
 
-function curve_lin_comb(points::Array{G, 1}, coeffs::Array{Z, 1}) where {Z <: AbstractModUInt, G <: EllipticCurvePoint}
+function curve_lin_comb(points::Array{G, 1}, coeffs::Array{Z, 1}) where {Z <: AbstractModUInt, G}
     lin_comb_mp(points, value.(coeffs))
 end
 
