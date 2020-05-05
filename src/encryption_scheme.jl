@@ -4,7 +4,7 @@ An example encryption scheme (Section 1.5)
 
 function rand_polynomial(
         rng::AbstractRNG, ::Type{Z}, d::Int, B::Int=0) where Z
-    Polynomial([rand_around_zero(rng, Z, B) for i in 1:d], negacyclic_modulus)
+    Polynomial(rand_around_zero(rng, Z, B, d), negacyclic_modulus)
 end
 
 

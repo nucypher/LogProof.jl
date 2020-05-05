@@ -2,53 +2,25 @@
 half_mod(::Type{T}) where T <: AbstractModUInt = convert(T, modulus(T) >> 1)
 
 
-function rand_around_zero(rng::AbstractRNG, ::Type{Z}, B::Int=0) where Z <: AbstractModUInt{T, M} where {T, M}
+function rand_around_zero(
+        rng::AbstractRNG, ::Type{Z}, B::Int=0, dims...
+        ) where Z <: AbstractModUInt{T, M} where {T, M}
     if B == 0
-        res = rand(rng, zero(BigInt):big(M - one(T)))
+        res = rand(rng, Z, dims...)
     else
         # TODO: or is it supposed to be the range (-B, B)?
-        res = rand(rng, 0:B-1)
-    end
-    convert(Z, res)
-end
-
-
-function Base.rand(rng::AbstractRNG, ::Type{MLUInt{N, T}}) where {N, T}
-    MLUInt{N, T}(tuple((rand(rng, T) for i in 1:N)...))
-end
-
-
-function Base.rand(rng::AbstractRNG, a::MLUInt{N, T}, b::MLUInt{N, T}) where {N, T}
-    while true
-        res = rand(rng, MLUInt{N, T})
-        if res <= b && (a == zero(MLUInt{N, T}) || res >= a)
-            return res
-        end
+        res = rand(rng, zero(Z):convert(Z, B-1), dims...)
     end
 end
 
 
-function _rand_moduint(rng::AbstractRNG, ::Type{Z}, min_val::T, max_val::T) where Z <: AbstractModUInt{T, M} where {T, M}
-    # FIXME: this assumes that [min_val, max_val] is close to the full range of T,
-    # otherwise rand() will be very slow.
-    val = rand(rng, min_val, max_val)
-    Z(val, DarkIntegers._verbatim)
+function rand_nonzero(rng::AbstractRNG, ::Type{Z}, dims...) where Z <: AbstractModUInt{T, M} where {T, M}
+    rand(rng, one(Z):-one(Z), dims...)
 end
 
 
-function Base.rand(rng::AbstractRNG, ::Type{Z}) where Z <: AbstractModUInt{T, M} where {T, M}
-    _rand_moduint(rng, Z, zero(T), M - one(T))
-end
-
-
-function rand_nonzero(rng::AbstractRNG, ::Type{Z}) where Z <: AbstractModUInt{T, M} where {T, M}
-    _rand_moduint(rng, Z, one(T), M - one(T))
-end
-
-
-function rand_point(rng::AbstractRNG, ::Type{G}) where G <: EllipticCurvePoint{C, Z} where {C, Z <: AbstractModUInt}
-    res = rand(rng, Z)
-    one(G) * res + one(G)
+function rand_point(rng::AbstractRNG, ::Type{G}, dims...) where G <: EllipticCurvePoint{C, Z} where {C, Z <: AbstractModUInt}
+    rand(rng, G, dims...)
 end
 
 
@@ -158,14 +130,14 @@ end
 
 
 function batch_mul_mp(
-        points::Array{P, 1}, coeff::T, w1::Int=4, w2::Int=4,
+        points::Array{P, 1}, coeff::T, w::Int=4,
         ) where {P <: EllipticCurvePoint{C, V}, T <: Integer} where {C, V}
     nw = nworkers()
     if nw == 1 || nw > length(points)
-        return batch_mul(points, coeff, w1, w2)
+        return batch_mul(points, coeff, w)
     end
     point_chunks = splay(points, nw)
-    vcat(pmap(batch_mul, point_chunks, repeat([coeff], nw), repeat([w1], nw), repeat([w2], nw))...)
+    vcat(pmap(batch_mul, point_chunks, repeat([coeff], nw), repeat([w], nw))...)
 end
 
 
