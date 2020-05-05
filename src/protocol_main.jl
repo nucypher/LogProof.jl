@@ -11,7 +11,7 @@ end
 struct ProofParams{Zq <: AbstractModUInt, Zp <: AbstractModUInt, G}
 
     function ProofParams(q::Int, point_coords::Type=JacobianPoint)
-        q_tp = UInt64
+        q_tp = UInt16
         Zq = ModUInt{q_tp, convert(q_tp, q)}
 
         curve = Curve_secp256k1
