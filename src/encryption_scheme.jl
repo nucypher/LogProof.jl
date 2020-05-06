@@ -133,6 +133,9 @@ function decrypt(
         ) where {R <: Polynomial{Z, N}} where {Z <: AbstractModUInt{T, M}, N} where {T, M}
 
     p = sk.params.message_bound
-    res = ct.v - ct.u * sk.s
-    broadcast_into_polynomial(central_mod, res, convert(T, p))
+
+    @timeit timer "decryption" begin
+        res = ct.v - ct.u * sk.s
+        broadcast_into_polynomial(central_mod, res, convert(T, p))
+    end
 end

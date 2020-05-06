@@ -21,11 +21,11 @@ function test_run(warmup=false)
     end
     pk, ct = encrypt(rng, pkey, m)
     main_synchronous(rng, pk, pk.verifier_knowledge)
+    m_back = decrypt(skey, ct)
     if !warmup
         LogProof.display_stage_timer()
     end
 
-    m_back = decrypt(skey, ct)
 
     @assert m == m_back
 end
