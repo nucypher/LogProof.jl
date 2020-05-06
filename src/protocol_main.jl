@@ -39,7 +39,7 @@ end
 size_estimate(::Z) where Z <: AbstractModUInt = size_estimate(Z)
 size_estimate(::G) where G <: EllipticCurvePoint = size_estimate(G)
 size_estimate(::Type{Z}) where Z <: AbstractModUInt{T, M} where {T, M} = num_bits(M) / 8
-size_estimate(::Type{G}) where G <: EllipticCurvePoint{C, T} where {C, T} = size_estimate(T)
+size_estimate(::Type{G}) where G <: EllipticCurvePoint{C, T} where {C, T} = sizeof(G)
 
 
 struct VerifierKnowledge{Zq, Zp, G}

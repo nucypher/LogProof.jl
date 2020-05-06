@@ -142,8 +142,9 @@ Network transfer
 
 \begin_layout Standard
 \begin_inset Tabular
-<lyxtabular version="3" rows="8" columns="2">
+<lyxtabular version="3" rows="8" columns="3">
 <features tabularvalignment="middle">
+<column alignment="center" valignment="top">
 <column alignment="center" valignment="top">
 <column alignment="center" valignment="top">
 <row>
@@ -156,11 +157,20 @@ Transfer
 
 \end_inset
 </cell>
-<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
 \begin_inset Text
 
 \begin_layout Plain Layout
 size
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+size (compressed points)
 \end_layout
 
 \end_inset
@@ -172,6 +182,15 @@ size
 
 \begin_layout Plain Layout
 Shared randomness (to verifier)
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+19.9 Mb
 \end_layout
 
 \end_inset
@@ -196,6 +215,15 @@ Random challenge (to prover)
 
 \end_inset
 </cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+3.05 Mb
+\end_layout
+
+\end_inset
+</cell>
 <cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
 \begin_inset Text
 
@@ -212,6 +240,19 @@ Random challenge (to prover)
 
 \begin_layout Plain Layout
 Folding info (to verifier)
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+208 b 
+\begin_inset Formula $\times$
+\end_inset
+
+ 17
 \end_layout
 
 \end_inset
@@ -240,6 +281,19 @@ Folding info (to prover)
 
 \end_inset
 </cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+32 b 
+\begin_inset Formula $\times$
+\end_inset
+
+ 17
+\end_layout
+
+\end_inset
+</cell>
 <cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
 \begin_inset Text
 
@@ -264,6 +318,15 @@ Inner product info (to verifier)
 
 \end_inset
 </cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+208 b
+\end_layout
+
+\end_inset
+</cell>
 <cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
 \begin_inset Text
 
@@ -284,6 +347,15 @@ Inner product info (to prover)
 
 \end_inset
 </cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+32 b
+\end_layout
+
+\end_inset
+</cell>
 <cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
 \begin_inset Text
 
@@ -300,6 +372,15 @@ Inner product info (to prover)
 
 \begin_layout Plain Layout
 Inner product info (to verifier)
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+96 b
 \end_layout
 
 \end_inset
@@ -2629,7 +2710,7 @@ Prover transfers
 \begin_inset Text
 
 \begin_layout Plain Layout
-6 Mb
+20 Mb (non-compressed) / 6 Mb (compressed)
 \end_layout
 
 \end_inset
