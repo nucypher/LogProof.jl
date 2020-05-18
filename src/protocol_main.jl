@@ -10,15 +10,11 @@ end
 
 struct ProofParams{Zq <: AbstractModUInt, Zp <: AbstractModUInt, G}
 
-    function ProofParams(q::Int, point_coords::Type=JacobianPoint)
+    function ProofParams(q::Int, curve::Type{<:EllipticCurve}=Curve_secp256k1)
         q_tp = UInt16
         Zq = ModUInt{q_tp, convert(q_tp, q)}
 
-        curve = Curve_secp256k1
-
-        p_tp = MLUInt{2, UInt128}
-        p = convert(p_tp, curve_order(curve))
-        Zp = ModUInt{p_tp, convert(p_tp, p)}
+        Zp = curve_scalar_type(curve)
 
         # p is prime, so NTT multiplication will be used automatically,
         # and finding a generator for a 256-bit prime takes a long time.
@@ -26,8 +22,7 @@ struct ProofParams{Zq <: AbstractModUInt, Zp <: AbstractModUInt, G}
         @eval DarkIntegers.known_polynomial_mul_function(
             ::Type{$Zp}, ::Val{N}, ::DarkIntegers.NegacyclicModulus) where N = DarkIntegers.karatsuba_mul
 
-        curve_tp = curve_scalar_type(curve, MgModUInt, p_tp)
-        G = point_coords{curve, curve_tp}
+        G = curve_point_type(curve)
 
         f_norm = 1 # we're using negacyclic polynomials, so it is the norm of `x^N + 1`
 

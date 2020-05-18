@@ -30,8 +30,10 @@ struct EncryptionParams{Zq}
     message_bound :: Int
     polynomial_order :: Int
 
-    function EncryptionParams(q::Int, noise_bound::Int, message_bound::Int, polynomial_order::Int)
-        proof_params = ProofParams(q)
+    function EncryptionParams(
+            q::Int, noise_bound::Int, message_bound::Int, polynomial_order::Int,
+            curve::Type{<:EllipticCurve}=Curve_secp256k1)
+        proof_params = ProofParams(q, curve)
         Zq, Zp, G = get_types(proof_params)
         new{Zq}(proof_params, noise_bound, message_bound, polynomial_order)
     end

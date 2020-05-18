@@ -22,13 +22,18 @@ end
 get_test_types(params::ProofParams{Zq, Zp, G}) where {Zq, Zp, G} = Zp, G
 
 
+curves = [Curve_secp256k1, RistrettoCurveVT] => ["SECP256k1", "Ristretto (var. time)"]
+
+
 @testgroup "Protocol" begin
 
 
-@testcase "Inner product" for synchronous in ([false, true] => ["actors", "synchronous"])
-    rng = MersenneTwister(123)
+(@testcase "Inner product" for
+        rng in fixed_rng(123),
+        curve in curves,
+        synchronous in ([false, true] => ["actors", "synchronous"])
 
-    params = ProofParams(251)
+    params = ProofParams(251, curve)
     Zp, G = get_test_types(params)
 
     l = 201
@@ -51,13 +56,15 @@ get_test_types(params::ProofParams{Zq, Zp, G}) where {Zq, Zp, G} = Zp, G
             LogProof.prover_inner_product_actor, LogProof.verifier_inner_product_actor,
             (rng, pk), (rng, vk))
     end
-end
+end)
 
 
-@testcase "Folding" for synchronous in ([false, true] => ["actors", "synchronous"])
-    rng = MersenneTwister(123)
+(@testcase "Folding" for
+        rng in fixed_rng(123),
+        curve in curves,
+        synchronous in ([false, true] => ["actors", "synchronous"])
 
-    params = ProofParams(251)
+    params = ProofParams(251, curve)
     Zp, G = get_test_types(params)
 
     l = 8
@@ -82,10 +89,13 @@ end
     end
 
     @assert vkf.t_prime == vkf.g * pkf.v1 + vkf.h * pkf.v2 + vkf.a * (pkf.v1 * pkf.v2) + vkf.u * (pkf.rho_prime)
-end
+end)
 
 
-@testcase "Main" for synchronous in ([false, true] => ["actors", "synchronous"])
+(@testcase "Main" for
+        rng in fixed_rng(123),
+        curve in curves,
+        synchronous in ([false, true] => ["actors", "synchronous"])
 
     params = ProofParams(251)
 
@@ -93,8 +103,6 @@ end
     m = 3
     k = 4
     B = 7
-
-    rng = MersenneTwister(123)
 
     A = make_A(rng, params, 8, n, m)
     S = make_S(rng, params, 8, m, k, B)
@@ -109,7 +117,7 @@ end
     else
         main_synchronous(rng, pk, vk)
     end
-end
+end)
 
 
 end

@@ -28,7 +28,7 @@ end
 rand_point(rng::AbstractRNG, ::Type{G}) where G = rand(rng, G)
 
 
-function rand_point(rng::AbstractRNG, ::Type{G}, dim) where G <: EllipticCurvePoint{C, Z} where {C, Z <: AbstractModUInt}
+function rand_point(rng::AbstractRNG, ::Type{G}, dim) where G <: EllipticCurvePoint
     nw = nworkers()
     if nw == 1 || nw > dim
         return rand(rng, G, dim)
@@ -157,7 +157,7 @@ end
 
 function batch_mul_mp(
         points::Array{P, 1}, coeff::T, w::Int=4,
-        ) where {P <: EllipticCurvePoint{C, V}, T <: Integer} where {C, V}
+        ) where {P <: EllipticCurvePoint, T <: Integer}
     nw = nworkers()
     if nw == 1 || nw > length(points)
         return batch_mul(points, coeff, w)
