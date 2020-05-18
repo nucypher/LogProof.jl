@@ -3,13 +3,14 @@ using LogProof
 using Random
 using DarkIntegers
 using DarkCurves
+using Curve25519
 
 
 function test_run(warmup=false)
 
     rng = MersenneTwister(123)
 
-    params = EncryptionParams(8191, 4, 2, 1024)
+    params = EncryptionParams(8191, 4, 2, 1024, RistrettoCurveVT)
 
     skey = SecretKey(rng, params)
     pkey = PublicKey(rng, skey)
