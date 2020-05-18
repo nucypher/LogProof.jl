@@ -1,9 +1,7 @@
 @testgroup "Encryption" begin
 
 
-@testcase "Encrypt/decrypt" begin
-
-    rng = MersenneTwister(123)
+@testcase "Encrypt/decrypt" for rng in fixed_rng(123)
 
     params = EncryptionParams(8191, 4, 2, 16)
 
